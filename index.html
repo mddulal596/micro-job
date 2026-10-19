@@ -1,1 +1,206 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Micro Job - Earn Money Online</title>
 
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+
+  <!-- AUTH SECTION -->
+  <div id="authSection" class="auth-container">
+
+    <div class="auth-card">
+
+      <div class="logo">
+        <i class="fa-solid fa-briefcase"></i>
+        <h1>Micro Job</h1>
+        <p>Work Smart, Earn More</p>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="loginForm">
+
+        <h2>Welcome Back!</h2>
+        <p class="subtitle">Login to your account</p>
+
+        <form id="login">
+
+          <div class="input-group">
+            <i class="fa-solid fa-envelope"></i>
+            <input type="email" id="loginEmail"
+            placeholder="Email Address" required>
+          </div>
+
+          <div class="input-group">
+            <i class="fa-solid fa-lock"></i>
+            <input type="password" id="loginPassword"
+            placeholder="Password" required>
+          </div>
+
+          <button type="submit" class="btn-primary">
+            Login
+          </button>
+
+        </form>
+
+        <p class="switch">
+          Don't have an account?
+          <a href="#" id="showRegister">Register</a>
+        </p>
+
+      </div>
+
+      <!-- REGISTER -->
+      <div id="registerForm" style="display:none;">
+
+        <h2>Create Account</h2>
+        <p class="subtitle">Join Micro Job Today</p>
+
+        <form id="register">
+
+          <div class="input-group">
+            <i class="fa-solid fa-user"></i>
+            <input type="text" id="regName"
+            placeholder="Full Name" required>
+          </div>
+
+          <div class="input-group">
+            <i class="fa-solid fa-envelope"></i>
+            <input type="email" id="regEmail"
+            placeholder="Email Address" required>
+          </div>
+
+          <div class="input-group">
+            <i class="fa-solid fa-phone"></i>
+            <input type="tel" id="regPhone"
+            placeholder="Phone Number" required>
+          </div>
+
+          <div class="input-group">
+            <i class="fa-solid fa-lock"></i>
+            <input type="password" id="regPassword"
+            placeholder="Password (min 6 characters)" required>
+          </div>
+
+          <button type="submit" class="btn-primary">
+            Create Account
+          </button>
+
+        </form>
+
+        <p class="switch">
+          Already have an account?
+          <a href="#" id="showLogin">Login</a>
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none;">
+
+    <header class="header">
+
+      <div class="brand">
+        <i class="fa-solid fa-briefcase"></i>
+        Micro Job
+      </div>
+
+      <button id="logoutBtn" class="logout-btn">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+
+    </header>
+
+    <main class="dashboard-container">
+
+      <h2>Welcome, <span id="userName">User</span> 👋</h2>
+
+      <div class="balance-card">
+
+        <p>Available Balance</p>
+        <h1>৳ <span id="userBalance">0.00</span></h1>
+
+        <div class="balance-actions">
+          <button>Deposit</button>
+          <button>Withdraw</button>
+        </div>
+
+      </div>
+
+      <div class="stats">
+
+        <div class="stat-box">
+          <i class="fa-solid fa-briefcase"></i>
+          <h3>0</h3>
+          <p>Completed Jobs</p>
+        </div>
+
+        <div class="stat-box">
+          <i class="fa-solid fa-clock"></i>
+          <h3>0</h3>
+          <p>Pending Jobs</p>
+        </div>
+
+        <div class="stat-box">
+          <i class="fa-solid fa-users"></i>
+          <h3>0</h3>
+          <p>Referrals</p>
+        </div>
+
+      </div>
+
+      <h3 class="section-title">Available Jobs</h3>
+
+      <div class="empty-jobs">
+        <i class="fa-solid fa-briefcase"></i>
+        <p>No jobs available right now.</p>
+      </div>
+
+    </main>
+
+    <nav class="bottom-nav">
+
+      <a href="#" class="active">
+        <i class="fa-solid fa-house"></i>
+        <span>Home</span>
+      </a>
+
+      <a href="#">
+        <i class="fa-solid fa-briefcase"></i>
+        <span>Jobs</span>
+      </a>
+
+      <a href="#">
+        <i class="fa-solid fa-circle-plus"></i>
+        <span>Post Job</span>
+      </a>
+
+      <a href="#">
+        <i class="fa-solid fa-wallet"></i>
+        <span>Wallet</span>
+      </a>
+
+      <a href="#">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+
+    </nav>
+
+  </div>
+
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>
