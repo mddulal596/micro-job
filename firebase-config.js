@@ -1,14 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-
-import {
-  getAuth
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-
-import {
-  getFirestore
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
-
-// Micro Job Firebase Configuration
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCgv2bgg2hNhzuqN0_lQFe_SroN_iZeZQY",
@@ -20,14 +12,8 @@ const firebaseConfig = {
   measurementId: "G-CJFLPEV19S"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Firebase Authentication
 const auth = getAuth(app);
-
-// Firestore Database
 const db = getFirestore(app);
 
-// Export Firebase Services
 export { app, auth, db };
