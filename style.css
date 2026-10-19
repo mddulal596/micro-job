@@ -1,0 +1,269 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f6fb;
+  color: #1e293b;
+}
+
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #4f46e5, #9333ea);
+}
+
+.auth-card {
+  background: white;
+  padding: 35px 25px;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 15px 40px rgba(0,0,0,.15);
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.logo i {
+  font-size: 42px;
+  color: #4f46e5;
+}
+
+.logo h1 {
+  margin-top: 10px;
+  color: #4f46e5;
+}
+
+.logo p {
+  color: #64748b;
+  margin-top: 5px;
+}
+
+.auth-card h2 {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #64748b;
+  margin-bottom: 25px;
+}
+
+.input-group {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.input-group i {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 14px 15px 14px 45px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  outline: none;
+  font-size: 14px;
+}
+
+.input-group input:focus {
+  border-color: #4f46e5;
+}
+
+.btn-primary {
+  width: 100%;
+  background: #4f46e5;
+  color: white;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #4338ca;
+}
+
+.switch {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 14px;
+}
+
+.switch a {
+  color: #4f46e5;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.header {
+  background: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,.05);
+}
+
+.brand {
+  color: #4f46e5;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.logout-btn {
+  background: #fee2e2;
+  color: #ef4444;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dashboard-container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 20px;
+  padding-bottom: 100px;
+}
+
+.dashboard-container h2 {
+  margin-bottom: 20px;
+}
+
+.balance-card {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  padding: 30px;
+  border-radius: 18px;
+  color: white;
+  margin-bottom: 25px;
+}
+
+.balance-card p {
+  opacity: .8;
+}
+
+.balance-card h1 {
+  font-size: 36px;
+  margin: 12px 0 25px;
+}
+
+.balance-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.balance-actions button {
+  flex: 1;
+  padding: 12px;
+  background: rgba(255,255,255,.2);
+  border: 1px solid rgba(255,255,255,.4);
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.stat-box {
+  background: white;
+  padding: 20px 10px;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.stat-box i {
+  font-size: 24px;
+  color: #4f46e5;
+}
+
+.stat-box h3 {
+  margin: 10px 0;
+}
+
+.stat-box p {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.section-title {
+  margin-bottom: 15px;
+}
+
+.empty-jobs {
+  background: white;
+  padding: 40px;
+  border-radius: 14px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.empty-jobs i {
+  font-size: 40px;
+  margin-bottom: 15px;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: white;
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 5px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,.08);
+}
+
+.bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.bottom-nav a i {
+  font-size: 20px;
+}
+
+.bottom-nav a.active {
+  color: #4f46e5;
+}
+
+@media(max-width: 480px) {
+  .stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .stat-box {
+    padding: 15px 5px;
+  }
+
+  .balance-card h1 {
+    font-size: 30px;
+  }
+}
