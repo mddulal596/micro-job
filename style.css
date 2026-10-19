@@ -44,18 +44,13 @@ button {
 }
 
 /* AUTH */
-
 .auth-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: linear-gradient(
-    135deg,
-    #5145e5,
-    #9333ea
-  );
+  background: linear-gradient(135deg, #5145e5, #9333ea);
 }
 
 .auth-card {
@@ -125,6 +120,7 @@ button {
 .switch a {
   color: var(--primary);
   font-weight: bold;
+  text-decoration: none;
 }
 
 .btn-primary {
@@ -143,7 +139,6 @@ button {
 }
 
 /* HEADER */
-
 .header {
   position: sticky;
   top: 0;
@@ -171,7 +166,7 @@ button {
 .header-balance {
   background: #dcfce7;
   color: #15803d;
-  padding: 9px;
+  padding: 9px 12px;
   border-radius: 20px;
   font-size: 13px;
   font-weight: bold;
@@ -186,7 +181,6 @@ button {
 }
 
 /* DASHBOARD */
-
 .dashboard-container {
   max-width: 1100px;
   margin: auto;
@@ -200,11 +194,7 @@ button {
 }
 
 .balance-card {
-  background: linear-gradient(
-    135deg,
-    #5145e5,
-    #7c3aed
-  );
+  background: linear-gradient(135deg, #5145e5, #7c3aed);
   color: white;
   padding: 30px;
   border-radius: 20px;
@@ -234,8 +224,11 @@ button {
   color: white;
 }
 
-/* STATS */
+.balance-actions i {
+  margin-right: 6px;
+}
 
+/* STATS */
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -266,7 +259,6 @@ button {
 }
 
 /* QUICK ACTIONS */
-
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -291,7 +283,6 @@ button {
 }
 
 /* CARDS */
-
 .card,
 .job-card {
   background: white;
@@ -353,7 +344,6 @@ button {
 }
 
 /* FORMS */
-
 label {
   display: block;
   margin: 15px 0 8px;
@@ -396,7 +386,6 @@ textarea.form-control {
 }
 
 /* WALLET */
-
 .wallet-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -419,7 +408,6 @@ textarea.form-control {
 }
 
 /* PROFILE */
-
 .profile-card {
   text-align: center;
 }
@@ -481,7 +469,6 @@ textarea.form-control {
 }
 
 /* BOTTOM NAVIGATION */
-
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -514,7 +501,6 @@ textarea.form-control {
 }
 
 /* MODAL */
-
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -550,8 +536,8 @@ textarea.form-control {
   margin-top: 15px;
 }
 
+/* RESPONSIVE */
 @media(max-width: 480px) {
-
   .dashboard-container {
     padding: 16px;
     padding-bottom: 110px;
@@ -572,5 +558,4 @@ textarea.form-control {
   .quick-actions {
     gap: 6px;
   }
-
 }
