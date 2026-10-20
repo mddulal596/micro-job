@@ -1,6 +1,4 @@
-import { initializeApp } from
-"https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
   getAuth,
   onAuthStateChanged,
@@ -9,9 +7,7 @@ import {
   signOut,
   updateProfile,
   getIdTokenResult
-} from
-"https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
   getFirestore,
   doc,
@@ -24,18 +20,12 @@ import {
   query,
   where,
   serverTimestamp
-} from
-"https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
-
-/* FIREBASE */
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-/* HELPERS */
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,7 +54,6 @@ function escapeHtml(value = "") {
 
 function money(value) {
   const n = Number(value || 0);
-
   return "৳ " + n.toLocaleString("en-BD", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
@@ -76,9 +65,11 @@ function dateText(value) {
 
   const date = value.toDate
     ? value.toDate()
-    : new Date(value.seconds * 1000);
+    : value.seconds
+      ? new Date(value.seconds * 1000)
+      : null;
 
-  return date.toLocaleString("bn-BD");
+  return date ? date.toLocaleString("bn-BD") : "—";
 }
 
 function nameText() {
@@ -90,9 +81,8 @@ function nameText() {
   );
 }
 
-function message(text, type = "success") {
+function showMessage(text, type = "success") {
   const box = $("messageBox");
-
   if (!box) return;
 
   box.textContent = text;
@@ -105,9 +95,16 @@ function message(text, type = "success") {
   });
 }
 
-function authMessage(text, type = "error") {
-  const box = $("authMessage");
+function clearMessage() {
+  const box = $("messageBox");
+  if (!box) return;
 
+  box.textContent = "";
+  box.className = "message hidden";
+}
+
+function showAuthMessage(text, type = "error") {
+  const box = $("authMessage");
   if (!box) return;
 
   box.textContent = text;
@@ -115,31 +112,28 @@ function authMessage(text, type = "error") {
   box.classList.remove("hidden");
 }
 
-function clearMessage() {
-  $("messageBox")?.classList.add("hidden");
+function clearAuthMessage() {
+  const box = $("authMessage");
+  if (!box) return;
+
+  box.textContent = "";
+  box.className = "message hidden";
 }
 
 function chip(status) {
   const safe = escapeHtml(status || "pending");
-
   return `<span class="chip ${safe}">${safe}</span>`;
 }
 
 function sortDocs(snapshot) {
   return snapshot.docs
-    .map((d) => ({
-      id: d.id,
-      ...d.data()
-    }))
+    .map((d) => ({ id: d.id, ...d.data() }))
     .sort((a, b) => {
       const x = a.createdAt?.seconds || 0;
       const y = b.createdAt?.seconds || 0;
-
       return y - x;
     });
 }
-
-/* NAVIGATION */
 
 const mainPanels = [
   "dashboard",
@@ -157,28 +151,14 @@ function showPanel(name) {
 
   mainPanels.forEach((panel) => {
     const el = $(panel + "Panel");
-
-    if (el) {
-      el.classList.toggle(
-        "active",
-        panel === name
-      );
-    }
+    if (el) el.classList.toggle("active", panel === name);
   });
 
-  const navName = (
-    name === "deposit" ||
-    name === "withdraw"
-  ) ? "wallet" : name;
+  const navName = (name === "deposit" || name === "withdraw") ? "wallet" : name;
 
-  document
-    .querySelectorAll(".nav-btn")
-    .forEach((button) => {
-      button.classList.toggle(
-        "active",
-        button.dataset.go === navName
-      );
-    });
+  document.querySelectorAll(".nav-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.go === navName);
+  });
 
   clearMessage();
 
@@ -190,34 +170,27 @@ function showPanel(name) {
 
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-go]");
-
   if (!button) return;
-
   showPanel(button.dataset.go);
 });
 
-/* LOGIN / REGISTER SWITCH */
-
 $("showRegister").addEventListener("click", (e) => {
   e.preventDefault();
-
   $("loginBox").classList.add("hidden");
   $("registerBox").classList.remove("hidden");
-  $("authMessage").classList.add("hidden");
+  clearAuthMessage();
 });
 
 $("showLogin").addEventListener("click", (e) => {
   e.preventDefault();
-
   $("registerBox").classList.add("hidden");
   $("loginBox").classList.remove("hidden");
-  $("authMessage").classList.add("hidden");
+  clearAuthMessage();
 });
-
-/* LOGIN */
 
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  clearAuthMessage();
 
   try {
     await signInWithEmailAndPassword(
@@ -227,66 +200,52 @@ $("loginForm").addEventListener("submit", async (e) => {
     );
 
     $("loginForm").reset();
-
   } catch (error) {
-    authMessage("Login failed: " + error.message);
+    showAuthMessage("Login failed: " + error.message);
   }
 });
 
-/* REGISTER */
-
 $("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  clearAuthMessage();
 
   const name = $("regName").value.trim();
   const email = $("regEmail").value.trim();
   const password = $("regPassword").value;
 
   if (!name || password.length < 6) {
-    authMessage("সঠিক নাম ও কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।");
+    showAuthMessage("সঠিক নাম ও কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।");
     return;
   }
 
   try {
-    const result = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+    const result = await createUserWithEmailAndPassword(auth, email, password);
 
     await updateProfile(result.user, {
       displayName: name
     });
 
-    await setDoc(
-      doc(db, "users", result.user.uid),
-      {
-        uid: result.user.uid,
-        name,
-        email,
-        balance: 0,
-        createdAt: serverTimestamp()
-      }
-    );
+    await setDoc(doc(db, "users", result.user.uid), {
+      uid: result.user.uid,
+      name,
+      email,
+      balance: 0,
+      createdAt: serverTimestamp()
+    });
 
     $("registerForm").reset();
-
   } catch (error) {
-    authMessage("Registration failed: " + error.message);
+    showAuthMessage("Registration failed: " + error.message);
   }
 });
-
-/* LOGOUT */
 
 $("logoutBtn").addEventListener("click", async () => {
   try {
     await signOut(auth);
   } catch (error) {
-    message(error.message, "error");
+    showMessage(error.message, "error");
   }
 });
-
-/* PROFILE */
 
 $("profileForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -296,28 +255,22 @@ $("profileForm").addEventListener("submit", async (e) => {
   const name = $("profileName").value.trim();
 
   if (!name) {
-    message("নাম লিখুন।", "error");
+    showMessage("নাম লিখুন।", "error");
     return;
   }
 
   try {
-    await updateProfile(auth.currentUser, {
-      displayName: name
+    await updateProfile(auth.currentUser, { displayName: name });
+
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      name
     });
 
-    await updateDoc(
-      doc(db, "users", currentUser.uid),
-      { name }
-    );
-
-    message("Profile updated successfully.");
-
+    showMessage("Profile updated successfully.");
   } catch (error) {
-    message(error.message, "error");
+    showMessage(error.message, "error");
   }
 });
-
-/* JOB POST */
 
 $("jobForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -328,13 +281,8 @@ $("jobForm").addEventListener("submit", async (e) => {
   const description = $("jobDescription").value.trim();
   const reward = Number($("jobReward").value);
 
-  if (
-    !title ||
-    !description ||
-    !Number.isFinite(reward) ||
-    reward <= 0
-  ) {
-    message("সঠিক Job তথ্য দিন।", "error");
+  if (!title || !description || !Number.isFinite(reward) || reward <= 0) {
+    showMessage("সঠিক Job তথ্য দিন।", "error");
     return;
   }
 
@@ -351,15 +299,11 @@ $("jobForm").addEventListener("submit", async (e) => {
     });
 
     $("jobForm").reset();
-
-    message("Job submitted! Admin approval pending.");
-
+    showMessage("Job submitted! Admin approval pending.");
   } catch (error) {
-    message(error.message, "error");
+    showMessage(error.message, "error");
   }
 });
-
-/* TASK SUBMIT */
 
 $("taskForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -368,24 +312,20 @@ $("taskForm").addEventListener("submit", async (e) => {
 
   const jobId = $("taskJobSelect").value;
   const proof = $("taskProof").value.trim();
-
   const job = activeJobs.find((j) => j.id === jobId);
 
   if (!job || !proof) {
-    message("Job ও Proof সঠিকভাবে দিন।", "error");
+    showMessage("Job ও Proof সঠিকভাবে দিন।", "error");
     return;
   }
 
   if (job.createdBy === currentUser.uid) {
-    message("নিজের Job-এ Task Submit করা যাবে না।", "error");
+    showMessage("নিজের Job-এ Task Submit করা যাবে না।", "error");
     return;
   }
 
-  if (myTasks.some((t) =>
-    t.jobId === jobId &&
-    t.submittedBy === currentUser.uid
-  )) {
-    message("এই Job-এ ইতিমধ্যে Task জমা দিয়েছেন।", "error");
+  if (myTasks.some((t) => t.jobId === jobId && t.submittedBy === currentUser.uid)) {
+    showMessage("এই Job-এ ইতিমধ্যে Task জমা দিয়েছেন।", "error");
     return;
   }
 
@@ -403,15 +343,11 @@ $("taskForm").addEventListener("submit", async (e) => {
     });
 
     $("taskForm").reset();
-
-    message("Task submitted successfully.");
-
+    showMessage("Task submitted successfully.");
   } catch (error) {
-    message(error.message, "error");
+    showMessage(error.message, "error");
   }
 });
-
-/* DEPOSIT */
 
 $("depositForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -421,12 +357,13 @@ $("depositForm").addEventListener("submit", async (e) => {
   const amount = Number($("depositAmount").value);
   const transactionId = $("depositTxn").value.trim();
 
-  if (
-    !Number.isFinite(amount) ||
-    amount <= 0 ||
-    !transactionId
-  ) {
-    message("সঠিক Amount ও Transaction ID দিন।", "error");
+  if (!Number.isFinite(amount) || amount < 300) {
+    showMessage("Minimum deposit amount is ৳300.", "error");
+    return;
+  }
+
+  if (!transactionId) {
+    showMessage("Transaction ID required.", "error");
     return;
   }
 
@@ -444,15 +381,12 @@ $("depositForm").addEventListener("submit", async (e) => {
     });
 
     $("depositForm").reset();
-
-    message("Deposit request submitted successfully.");
-
+    showMessage("Deposit request submitted successfully.");
+    showPanel("wallet");
   } catch (error) {
-    message(error.message, "error");
+    showMessage(error.message, "error");
   }
 });
-
-/* WITHDRAW */
 
 $("withdrawForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -462,12 +396,13 @@ $("withdrawForm").addEventListener("submit", async (e) => {
   const amount = Number($("withdrawAmount").value);
   const accountNumber = $("withdrawAccount").value.trim();
 
-  if (
-    !Number.isFinite(amount) ||
-    amount <= 0 ||
-    !accountNumber
-  ) {
-    message("সঠিক Amount ও Account Number দিন।", "error");
+  if (!Number.isFinite(amount) || amount < 5000) {
+    showMessage("Minimum withdraw amount is ৳5000.", "error");
+    return;
+  }
+
+  if (!accountNumber) {
+    showMessage("Account number required.", "error");
     return;
   }
 
@@ -485,15 +420,12 @@ $("withdrawForm").addEventListener("submit", async (e) => {
     });
 
     $("withdrawForm").reset();
-
-    message("Withdrawal request submitted successfully.");
-
+    showMessage("Withdrawal request submitted successfully.");
+    showPanel("wallet");
   } catch (error) {
-    message(error.message, "error");
+    showMessage(error.message, "error");
   }
 });
-
-/* DASHBOARD */
 
 function renderDashboard() {
   const balance = money(currentProfile?.balance || 0);
@@ -503,16 +435,12 @@ function renderDashboard() {
   $("walletBalance").textContent = balance;
   $("profileBalance").textContent = balance;
 
-  $("welcomeText").textContent =
-    "Welcome, " + nameText() + " 👋";
-
+  $("welcomeText").textContent = "Welcome, " + nameText() + " 👋";
   $("profileDisplayName").textContent = nameText();
-
-  $("profileEmail").textContent =
-    currentUser?.email || "—";
+  $("profileEmail").textContent = currentUser?.email || "—";
 
   if (document.activeElement !== $("profileName")) {
-    $("profileName").value = currentProfile?.name || "";
+    $("profileName").value = currentProfile?.name || currentUser?.displayName || "";
   }
 
   $("completedJobsCount").textContent =
@@ -521,23 +449,16 @@ function renderDashboard() {
   $("pendingJobsCount").textContent =
     myTasks.filter((t) => t.status === "pending").length;
 
-  // Referral system has not been implemented yet.
   $("referralsCount").textContent = "0";
 }
 
-/* JOB CARD */
-
 function jobCard(job) {
   const ownJob = job.createdBy === currentUser?.uid;
-
-  const alreadySubmitted = myTasks.some(
-    (task) => task.jobId === job.id
-  );
+  const alreadySubmitted = myTasks.some((task) => task.jobId === job.id);
 
   return `
     <article class="job-card">
-
-      <span class="badge active">Active</span>
+      <span class="chip active">active</span>
 
       <h3>${escapeHtml(job.title)}</h3>
 
@@ -549,9 +470,7 @@ function jobCard(job) {
           ${escapeHtml(job.creatorName || "User")}
         </span>
 
-        <span class="job-price">
-          ${money(job.reward)}
-        </span>
+        <span class="job-price">${money(job.reward)}</span>
       </div>
 
       ${
@@ -563,22 +482,18 @@ function jobCard(job) {
               <button
                 class="btn-primary"
                 type="button"
-                data-task-job="${escapeHtml(job.id)}">
+                data-task-job="${escapeHtml(job.id)}"
+              >
                 Submit Task
               </button>
             `
       }
-
     </article>
   `;
 }
 
-/* RENDER JOBS */
-
 function renderJobs() {
-  const available = activeJobs.filter(
-    (job) => job.createdBy !== currentUser?.uid
-  );
+  const available = activeJobs.filter((job) => job.createdBy !== currentUser?.uid);
 
   const html = available.length
     ? available.map(jobCard).join("")
@@ -590,14 +505,20 @@ function renderJobs() {
   const select = $("taskJobSelect");
   const previous = select.value;
 
-  select.innerHTML = `
-    <option value="">Select Job</option>
-    ${available.map((job) => `
-      <option value="${escapeHtml(job.id)}">
-        ${escapeHtml(job.title)} - ${money(job.reward)}
-      </option>
-    `).join("")}
-  `;
+  if (!available.length) {
+    select.innerHTML = `<option value="">No active jobs</option>`;
+    select.disabled = true;
+  } else {
+    select.disabled = false;
+    select.innerHTML = `
+      <option value="">Select Job</option>
+      ${available.map((job) => `
+        <option value="${escapeHtml(job.id)}">
+          ${escapeHtml(job.title)} - ${money(job.reward)}
+        </option>
+      `).join("")}
+    `;
+  }
 
   if (available.some((job) => job.id === previous)) {
     select.value = previous;
@@ -606,84 +527,72 @@ function renderJobs() {
   $("myJobsList").innerHTML = myJobs.length
     ? myJobs.map((job) => `
       <article class="item-card">
-
         <div class="item-top">
           <h4>${escapeHtml(job.title)}</h4>
           ${chip(job.status)}
         </div>
 
-        <p>${escapeHtml(job.description)}</p>
+        <div class="item-body">
+          <p>${escapeHtml(job.description || "")}</p>
+        </div>
 
         <div class="meta">
           <span>Reward: ${money(job.reward)}</span>
           <span>${dateText(job.createdAt)}</span>
         </div>
-
       </article>
     `).join("")
     : `<div class="empty">No posted jobs.</div>`;
 }
 
-/* JOB BUTTON ACTION */
-
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-task-job]");
-
   if (!button) return;
 
   const jobId = button.dataset.taskJob;
-
   showPanel("tasks");
-
   $("taskJobSelect").value = jobId;
 });
-
-/* RENDER TASKS */
 
 function renderTasks() {
   $("myTasksList").innerHTML = myTasks.length
     ? myTasks.map((task) => `
       <article class="item-card">
-
         <div class="item-top">
           <h4>${escapeHtml(task.jobTitle || "Task")}</h4>
           ${chip(task.status)}
         </div>
 
-        <p>${escapeHtml(task.proof || "")}</p>
+        <div class="item-body">
+          <p>${escapeHtml(task.proof || "")}</p>
+        </div>
 
         <div class="meta">
           <span>${dateText(task.createdAt)}</span>
         </div>
-
       </article>
     `).join("")
     : `<div class="empty">No submitted tasks.</div>`;
 }
 
-/* RENDER WALLET */
-
 function renderWallet() {
   $("depositHistoryList").innerHTML = deposits.length
     ? deposits.map((item) => `
       <article class="item-card">
-
         <div class="item-top">
           <h4>${escapeHtml(item.method)} Deposit</h4>
           ${chip(item.status)}
         </div>
 
-        <p>Amount: ${money(item.amount)}</p>
-
-        <p>
-          Transaction ID:
-          ${escapeHtml(item.transactionId || "")}
-        </p>
-
-        <div class="meta">
-          ${dateText(item.createdAt)}
+        <div class="item-body">
+          <p>Amount: ${money(item.amount)}</p>
+          <p>Transaction ID: ${escapeHtml(item.transactionId || "")}</p>
+          ${item.note ? `<p>Note: ${escapeHtml(item.note)}</p>` : ""}
         </div>
 
+        <div class="meta">
+          <span>${dateText(item.createdAt)}</span>
+        </div>
       </article>
     `).join("")
     : `<div class="empty">No deposit history.</div>`;
@@ -691,40 +600,32 @@ function renderWallet() {
   $("withdrawHistoryList").innerHTML = withdrawals.length
     ? withdrawals.map((item) => `
       <article class="item-card">
-
         <div class="item-top">
           <h4>${escapeHtml(item.method)} Withdrawal</h4>
           ${chip(item.status)}
         </div>
 
-        <p>Amount: ${money(item.amount)}</p>
-
-        <p>
-          Account:
-          ${escapeHtml(item.accountNumber || "")}
-        </p>
-
-        <div class="meta">
-          ${dateText(item.createdAt)}
+        <div class="item-body">
+          <p>Amount: ${money(item.amount)}</p>
+          <p>Account: ${escapeHtml(item.accountNumber || "")}</p>
+          ${item.note ? `<p>Note: ${escapeHtml(item.note)}</p>` : ""}
         </div>
 
+        <div class="meta">
+          <span>${dateText(item.createdAt)}</span>
+        </div>
       </article>
     `).join("")
     : `<div class="empty">No withdrawal history.</div>`;
 }
 
-/* RENDER ALL */
-
 function renderAll() {
   if (!currentUser) return;
-
   renderDashboard();
   renderJobs();
   renderTasks();
   renderWallet();
 }
-
-/* FIRESTORE LISTENERS */
 
 function stopListeners() {
   listeners.forEach((unsubscribe) => {
@@ -734,15 +635,11 @@ function stopListeners() {
       console.error(error);
     }
   });
-
   listeners = [];
 }
 
 function listen(collectionName, field, value, callback) {
-  const q = query(
-    collection(db, collectionName),
-    where(field, "==", value)
-  );
+  const q = query(collection(db, collectionName), where(field, "==", value));
 
   const unsubscribe = onSnapshot(
     q,
@@ -751,10 +648,7 @@ function listen(collectionName, field, value, callback) {
       renderAll();
     },
     (error) => {
-      message(
-        collectionName + ": " + error.message,
-        "error"
-      );
+      showMessage(collectionName + ": " + error.message, "error");
     }
   );
 
@@ -771,7 +665,7 @@ function startListeners(uid) {
       }
     },
     (error) => {
-      message(error.message, "error");
+      showMessage(error.message, "error");
     }
   );
 
@@ -798,8 +692,6 @@ function startListeners(uid) {
   });
 }
 
-/* CREATE USER PROFILE */
-
 async function ensureUserProfile(user) {
   const ref = doc(db, "users", user.uid);
   const snapshot = await getDoc(ref);
@@ -814,8 +706,6 @@ async function ensureUserProfile(user) {
     });
   }
 }
-
-/* AUTH STATE */
 
 onAuthStateChanged(auth, async (user) => {
   const version = ++authVersion;
@@ -836,7 +726,9 @@ onAuthStateChanged(auth, async (user) => {
     $("authView").classList.remove("hidden");
     $("appView").classList.add("hidden");
     $("adminLink").classList.add("hidden");
-
+    $("loginBox").classList.remove("hidden");
+    $("registerBox").classList.add("hidden");
+    clearMessage();
     return;
   }
 
@@ -850,9 +742,7 @@ onAuthStateChanged(auth, async (user) => {
 
   try {
     const token = await getIdTokenResult(user, true);
-
     isAdmin = token.claims.admin === true;
-
   } catch (error) {
     console.error("Admin check:", error);
   }
@@ -864,9 +754,8 @@ onAuthStateChanged(auth, async (user) => {
   $("authView").classList.add("hidden");
   $("appView").classList.remove("hidden");
 
+  clearAuthMessage();
   showPanel("dashboard");
-
   startListeners(user.uid);
-
   renderAll();
 });
