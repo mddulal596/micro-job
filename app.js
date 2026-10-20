@@ -1,4 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { initializeApp } from
+"https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
 import {
   getAuth,
   onAuthStateChanged,
@@ -7,12 +9,14 @@ import {
   signOut,
   updateProfile,
   getIdTokenResult
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+} from
+"https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
 import {
   getFirestore,
   doc,
-  setDoc,
   getDoc,
+  setDoc,
   updateDoc,
   collection,
   addDoc,
@@ -20,63 +24,20 @@ import {
   query,
   where,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+} from
+"https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
 import { firebaseConfig } from "./firebase-config.js";
+
+/* FIREBASE */
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const authView = document.getElementById("authView");
-const appView = document.getElementById("appView");
-const messageBox = document.getElementById("messageBox");
-const userBadge = document.getElementById("userBadge");
-const adminLink = document.getElementById("adminLink");
-const logoutBtn = document.getElementById("logoutBtn");
+/* HELPERS */
 
-const dashboardStats = document.getElementById("dashboardStats");
-const profileEmail = document.getElementById("profileEmail");
-const profileBalance = document.getElementById("profileBalance");
-const profileNameInput = document.getElementById("profileName");
-
-const activeJobsList = document.getElementById("activeJobsList");
-const myJobsList = document.getElementById("myJobsList");
-const myTasksList = document.getElementById("myTasksList");
-const taskJobSelect = document.getElementById("taskJobSelect");
-const depositHistoryList = document.getElementById("depositHistoryList");
-const withdrawHistoryList = document.getElementById("withdrawHistoryList");
-
-const loginForm = document.getElementById("loginForm");
-const registerForm = document.getElementById("registerForm");
-const profileForm = document.getElementById("profileForm");
-const jobForm = document.getElementById("jobForm");
-const taskForm = document.getElementById("taskForm");
-const depositForm = document.getElementById("depositForm");
-const withdrawForm = document.getElementById("withdrawForm");
-
-const loginEmail = document.getElementById("loginEmail");
-const loginPassword = document.getElementById("loginPassword");
-const regName = document.getElementById("regName");
-const regEmail = document.getElementById("regEmail");
-const regPassword = document.getElementById("regPassword");
-
-const jobTitle = document.getElementById("jobTitle");
-const jobDescription = document.getElementById("jobDescription");
-const jobReward = document.getElementById("jobReward");
-
-const taskProof = document.getElementById("taskProof");
-
-const depositMethod = document.getElementById("depositMethod");
-const depositAmount = document.getElementById("depositAmount");
-const depositTxn = document.getElementById("depositTxn");
-const depositNote = document.getElementById("depositNote");
-
-const withdrawMethod = document.getElementById("withdrawMethod");
-const withdrawAmount = document.getElementById("withdrawAmount");
-const withdrawAccount = document.getElementById("withdrawAccount");
-const withdrawNote = document.getElementById("withdrawNote");
-
-const tabs = document.querySelectorAll(".tab");
+const $ = (id) => document.getElementById(id);
 
 let currentUser = null;
 let currentProfile = null;
@@ -85,121 +46,765 @@ let isAdmin = false;
 let activeJobs = [];
 let myJobs = [];
 let myTasks = [];
-let myDeposits = [];
-let myWithdrawals = [];
+let deposits = [];
+let withdrawals = [];
 
-let unsubscribers = [];
+let listeners = [];
+let authVersion = 0;
 
 function escapeHtml(value = "") {
-  return String(value).replace(/[&<>"']/g, (match) => ({
+  return String(value).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;"
-  }[match]));
+  }[c]));
 }
 
-function formatMoney(value) {
-  const number = Number(value || 0);
-  return `৳${number.toLocaleString("en-BD", { maximumFractionDigits: 2 })}`;
+function money(value) {
+  const n = Number(value || 0);
+
+  return "৳ " + n.toLocaleString("en-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
-function toDate(ts) {
-  if (!ts) return null;
-  if (typeof ts.toDate === "function") return ts.toDate();
-  if (ts.seconds) return new Date(ts.seconds * 1000);
-  return null;
+function dateText(value) {
+  if (!value) return "—";
+
+  const date = value.toDate
+    ? value.toDate()
+    : new Date(value.seconds * 1000);
+
+  return date.toLocaleString("bn-BD");
 }
 
-function formatTime(ts) {
-  const d = toDate(ts);
-  return d ? d.toLocaleString("bn-BD") : "—";
-}
-
-function truncate(text = "", limit = 180) {
-  const s = String(text);
-  return s.length > limit ? `${s.slice(0, limit)}...` : s;
-}
-
-function statusChip(status) {
-  const safe = escapeHtml(status || "pending");
-  return `<span class="chip ${safe}">${safe}</span>`;
-}
-
-function getDisplayName() {
+function nameText() {
   return (
     currentProfile?.name ||
     currentUser?.displayName ||
-    currentUser?.email?.split("@")?.[0] ||
+    currentUser?.email?.split("@")[0] ||
     "User"
   );
 }
 
-function setMessage(text, type = "success") {
-  if (!messageBox) return;
-  messageBox.textContent = text;
-  messageBox.className = `message ${type}`;
-  messageBox.classList.remove("hidden");
+function message(text, type = "success") {
+  const box = $("messageBox");
+
+  if (!box) return;
+
+  box.textContent = text;
+  box.className = "message " + type;
+  box.classList.remove("hidden");
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+function authMessage(text, type = "error") {
+  const box = $("authMessage");
+
+  if (!box) return;
+
+  box.textContent = text;
+  box.className = "message " + type;
+  box.classList.remove("hidden");
 }
 
 function clearMessage() {
-  if (!messageBox) return;
-  messageBox.textContent = "";
-  messageBox.className = "message hidden";
+  $("messageBox")?.classList.add("hidden");
 }
 
-function showAuthView() {
-  authView.classList.remove("hidden");
-  appView.classList.add("hidden");
-  userBadge.classList.add("hidden");
-  adminLink.classList.add("hidden");
-  logoutBtn.classList.add("hidden");
-  clearMessage();
+function chip(status) {
+  const safe = escapeHtml(status || "pending");
+
+  return `<span class="chip ${safe}">${safe}</span>`;
 }
 
-function showAppView() {
-  authView.classList.add("hidden");
-  appView.classList.remove("hidden");
-  logoutBtn.classList.remove("hidden");
-  if (isAdmin) adminLink.classList.remove("hidden");
-  else adminLink.classList.add("hidden");
+function sortDocs(snapshot) {
+  return snapshot.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data()
+    }))
+    .sort((a, b) => {
+      const x = a.createdAt?.seconds || 0;
+      const y = b.createdAt?.seconds || 0;
+
+      return y - x;
+    });
 }
+
+/* NAVIGATION */
+
+const mainPanels = [
+  "dashboard",
+  "jobs",
+  "post",
+  "tasks",
+  "wallet",
+  "deposit",
+  "withdraw",
+  "profile"
+];
 
 function showPanel(name) {
-  tabs.forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.panel === name);
-  });
+  if (!mainPanels.includes(name)) return;
 
-  document.querySelectorAll(".panel").forEach((panel) => {
-    panel.classList.remove("active");
-  });
+  mainPanels.forEach((panel) => {
+    const el = $(panel + "Panel");
 
-  const target = document.getElementById(`${name}Panel`);
-  if (target) target.classList.add("active");
-}
-
-function cleanListeners() {
-  unsubscribers.forEach((unsub) => {
-    try {
-      unsub();
-    } catch (error) {
-      console.warn(error);
+    if (el) {
+      el.classList.toggle(
+        "active",
+        panel === name
+      );
     }
   });
-  unsubscribers = [];
+
+  const navName = (
+    name === "deposit" ||
+    name === "withdraw"
+  ) ? "wallet" : name;
+
+  document
+    .querySelectorAll(".nav-btn")
+    .forEach((button) => {
+      button.classList.toggle(
+        "active",
+        button.dataset.go === navName
+      );
+    });
+
+  clearMessage();
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 }
 
-function listenRef(unsub) {
-  unsubscribers.push(unsub);
-  return unsub;
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-go]");
+
+  if (!button) return;
+
+  showPanel(button.dataset.go);
+});
+
+/* LOGIN / REGISTER SWITCH */
+
+$("showRegister").addEventListener("click", (e) => {
+  e.preventDefault();
+
+  $("loginBox").classList.add("hidden");
+  $("registerBox").classList.remove("hidden");
+  $("authMessage").classList.add("hidden");
+});
+
+$("showLogin").addEventListener("click", (e) => {
+  e.preventDefault();
+
+  $("registerBox").classList.add("hidden");
+  $("loginBox").classList.remove("hidden");
+  $("authMessage").classList.add("hidden");
+});
+
+/* LOGIN */
+
+$("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      $("loginEmail").value.trim(),
+      $("loginPassword").value
+    );
+
+    $("loginForm").reset();
+
+  } catch (error) {
+    authMessage("Login failed: " + error.message);
+  }
+});
+
+/* REGISTER */
+
+$("registerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const name = $("regName").value.trim();
+  const email = $("regEmail").value.trim();
+  const password = $("regPassword").value;
+
+  if (!name || password.length < 6) {
+    authMessage("সঠিক নাম ও কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।");
+    return;
+  }
+
+  try {
+    const result = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    await updateProfile(result.user, {
+      displayName: name
+    });
+
+    await setDoc(
+      doc(db, "users", result.user.uid),
+      {
+        uid: result.user.uid,
+        name,
+        email,
+        balance: 0,
+        createdAt: serverTimestamp()
+      }
+    );
+
+    $("registerForm").reset();
+
+  } catch (error) {
+    authMessage("Registration failed: " + error.message);
+  }
+});
+
+/* LOGOUT */
+
+$("logoutBtn").addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    message(error.message, "error");
+  }
+});
+
+/* PROFILE */
+
+$("profileForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!currentUser) return;
+
+  const name = $("profileName").value.trim();
+
+  if (!name) {
+    message("নাম লিখুন।", "error");
+    return;
+  }
+
+  try {
+    await updateProfile(auth.currentUser, {
+      displayName: name
+    });
+
+    await updateDoc(
+      doc(db, "users", currentUser.uid),
+      { name }
+    );
+
+    message("Profile updated successfully.");
+
+  } catch (error) {
+    message(error.message, "error");
+  }
+});
+
+/* JOB POST */
+
+$("jobForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!currentUser) return;
+
+  const title = $("jobTitle").value.trim();
+  const description = $("jobDescription").value.trim();
+  const reward = Number($("jobReward").value);
+
+  if (
+    !title ||
+    !description ||
+    !Number.isFinite(reward) ||
+    reward <= 0
+  ) {
+    message("সঠিক Job তথ্য দিন।", "error");
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "jobs"), {
+      title,
+      description,
+      reward,
+      createdBy: currentUser.uid,
+      creatorName: nameText(),
+      creatorEmail: currentUser.email || "",
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    $("jobForm").reset();
+
+    message("Job submitted! Admin approval pending.");
+
+  } catch (error) {
+    message(error.message, "error");
+  }
+});
+
+/* TASK SUBMIT */
+
+$("taskForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!currentUser) return;
+
+  const jobId = $("taskJobSelect").value;
+  const proof = $("taskProof").value.trim();
+
+  const job = activeJobs.find((j) => j.id === jobId);
+
+  if (!job || !proof) {
+    message("Job ও Proof সঠিকভাবে দিন।", "error");
+    return;
+  }
+
+  if (job.createdBy === currentUser.uid) {
+    message("নিজের Job-এ Task Submit করা যাবে না।", "error");
+    return;
+  }
+
+  if (myTasks.some((t) =>
+    t.jobId === jobId &&
+    t.submittedBy === currentUser.uid
+  )) {
+    message("এই Job-এ ইতিমধ্যে Task জমা দিয়েছেন।", "error");
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "tasks"), {
+      jobId: job.id,
+      jobTitle: job.title,
+      jobOwnerUid: job.createdBy,
+      jobOwnerName: job.creatorName || "Unknown",
+      submittedBy: currentUser.uid,
+      submittedByName: nameText(),
+      proof,
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    $("taskForm").reset();
+
+    message("Task submitted successfully.");
+
+  } catch (error) {
+    message(error.message, "error");
+  }
+});
+
+/* DEPOSIT */
+
+$("depositForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!currentUser) return;
+
+  const amount = Number($("depositAmount").value);
+  const transactionId = $("depositTxn").value.trim();
+
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    !transactionId
+  ) {
+    message("সঠিক Amount ও Transaction ID দিন।", "error");
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "deposits"), {
+      uid: currentUser.uid,
+      name: nameText(),
+      email: currentUser.email || "",
+      method: $("depositMethod").value,
+      amount,
+      transactionId,
+      note: $("depositNote").value.trim(),
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    $("depositForm").reset();
+
+    message("Deposit request submitted successfully.");
+
+  } catch (error) {
+    message(error.message, "error");
+  }
+});
+
+/* WITHDRAW */
+
+$("withdrawForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!currentUser) return;
+
+  const amount = Number($("withdrawAmount").value);
+  const accountNumber = $("withdrawAccount").value.trim();
+
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    !accountNumber
+  ) {
+    message("সঠিক Amount ও Account Number দিন।", "error");
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "withdrawals"), {
+      uid: currentUser.uid,
+      name: nameText(),
+      email: currentUser.email || "",
+      method: $("withdrawMethod").value,
+      amount,
+      accountNumber,
+      note: $("withdrawNote").value.trim(),
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    $("withdrawForm").reset();
+
+    message("Withdrawal request submitted successfully.");
+
+  } catch (error) {
+    message(error.message, "error");
+  }
+});
+
+/* DASHBOARD */
+
+function renderDashboard() {
+  const balance = money(currentProfile?.balance || 0);
+
+  $("headerBalance").textContent = balance;
+  $("balanceAmount").textContent = balance;
+  $("walletBalance").textContent = balance;
+  $("profileBalance").textContent = balance;
+
+  $("welcomeText").textContent =
+    "Welcome, " + nameText() + " 👋";
+
+  $("profileDisplayName").textContent = nameText();
+
+  $("profileEmail").textContent =
+    currentUser?.email || "—";
+
+  if (document.activeElement !== $("profileName")) {
+    $("profileName").value = currentProfile?.name || "";
+  }
+
+  $("completedJobsCount").textContent =
+    myTasks.filter((t) => t.status === "approved").length;
+
+  $("pendingJobsCount").textContent =
+    myTasks.filter((t) => t.status === "pending").length;
+
+  // Referral system has not been implemented yet.
+  $("referralsCount").textContent = "0";
 }
 
-async function ensureUserDoc(user) {
+/* JOB CARD */
+
+function jobCard(job) {
+  const ownJob = job.createdBy === currentUser?.uid;
+
+  const alreadySubmitted = myTasks.some(
+    (task) => task.jobId === job.id
+  );
+
+  return `
+    <article class="job-card">
+
+      <span class="badge active">Active</span>
+
+      <h3>${escapeHtml(job.title)}</h3>
+
+      <p>${escapeHtml(job.description || "")}</p>
+
+      <div class="job-meta">
+        <span>
+          <i class="fa-solid fa-user"></i>
+          ${escapeHtml(job.creatorName || "User")}
+        </span>
+
+        <span class="job-price">
+          ${money(job.reward)}
+        </span>
+      </div>
+
+      ${
+        ownJob
+          ? `<p class="muted">Your Posted Job</p>`
+          : alreadySubmitted
+            ? `<p class="muted">Task already submitted</p>`
+            : `
+              <button
+                class="btn-primary"
+                type="button"
+                data-task-job="${escapeHtml(job.id)}">
+                Submit Task
+              </button>
+            `
+      }
+
+    </article>
+  `;
+}
+
+/* RENDER JOBS */
+
+function renderJobs() {
+  const available = activeJobs.filter(
+    (job) => job.createdBy !== currentUser?.uid
+  );
+
+  const html = available.length
+    ? available.map(jobCard).join("")
+    : `<div class="empty">No jobs available.</div>`;
+
+  $("homeJobsList").innerHTML = html;
+  $("activeJobsList").innerHTML = html;
+
+  const select = $("taskJobSelect");
+  const previous = select.value;
+
+  select.innerHTML = `
+    <option value="">Select Job</option>
+    ${available.map((job) => `
+      <option value="${escapeHtml(job.id)}">
+        ${escapeHtml(job.title)} - ${money(job.reward)}
+      </option>
+    `).join("")}
+  `;
+
+  if (available.some((job) => job.id === previous)) {
+    select.value = previous;
+  }
+
+  $("myJobsList").innerHTML = myJobs.length
+    ? myJobs.map((job) => `
+      <article class="item-card">
+
+        <div class="item-top">
+          <h4>${escapeHtml(job.title)}</h4>
+          ${chip(job.status)}
+        </div>
+
+        <p>${escapeHtml(job.description)}</p>
+
+        <div class="meta">
+          <span>Reward: ${money(job.reward)}</span>
+          <span>${dateText(job.createdAt)}</span>
+        </div>
+
+      </article>
+    `).join("")
+    : `<div class="empty">No posted jobs.</div>`;
+}
+
+/* JOB BUTTON ACTION */
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-task-job]");
+
+  if (!button) return;
+
+  const jobId = button.dataset.taskJob;
+
+  showPanel("tasks");
+
+  $("taskJobSelect").value = jobId;
+});
+
+/* RENDER TASKS */
+
+function renderTasks() {
+  $("myTasksList").innerHTML = myTasks.length
+    ? myTasks.map((task) => `
+      <article class="item-card">
+
+        <div class="item-top">
+          <h4>${escapeHtml(task.jobTitle || "Task")}</h4>
+          ${chip(task.status)}
+        </div>
+
+        <p>${escapeHtml(task.proof || "")}</p>
+
+        <div class="meta">
+          <span>${dateText(task.createdAt)}</span>
+        </div>
+
+      </article>
+    `).join("")
+    : `<div class="empty">No submitted tasks.</div>`;
+}
+
+/* RENDER WALLET */
+
+function renderWallet() {
+  $("depositHistoryList").innerHTML = deposits.length
+    ? deposits.map((item) => `
+      <article class="item-card">
+
+        <div class="item-top">
+          <h4>${escapeHtml(item.method)} Deposit</h4>
+          ${chip(item.status)}
+        </div>
+
+        <p>Amount: ${money(item.amount)}</p>
+
+        <p>
+          Transaction ID:
+          ${escapeHtml(item.transactionId || "")}
+        </p>
+
+        <div class="meta">
+          ${dateText(item.createdAt)}
+        </div>
+
+      </article>
+    `).join("")
+    : `<div class="empty">No deposit history.</div>`;
+
+  $("withdrawHistoryList").innerHTML = withdrawals.length
+    ? withdrawals.map((item) => `
+      <article class="item-card">
+
+        <div class="item-top">
+          <h4>${escapeHtml(item.method)} Withdrawal</h4>
+          ${chip(item.status)}
+        </div>
+
+        <p>Amount: ${money(item.amount)}</p>
+
+        <p>
+          Account:
+          ${escapeHtml(item.accountNumber || "")}
+        </p>
+
+        <div class="meta">
+          ${dateText(item.createdAt)}
+        </div>
+
+      </article>
+    `).join("")
+    : `<div class="empty">No withdrawal history.</div>`;
+}
+
+/* RENDER ALL */
+
+function renderAll() {
+  if (!currentUser) return;
+
+  renderDashboard();
+  renderJobs();
+  renderTasks();
+  renderWallet();
+}
+
+/* FIRESTORE LISTENERS */
+
+function stopListeners() {
+  listeners.forEach((unsubscribe) => {
+    try {
+      unsubscribe();
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  listeners = [];
+}
+
+function listen(collectionName, field, value, callback) {
+  const q = query(
+    collection(db, collectionName),
+    where(field, "==", value)
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      callback(sortDocs(snapshot));
+      renderAll();
+    },
+    (error) => {
+      message(
+        collectionName + ": " + error.message,
+        "error"
+      );
+    }
+  );
+
+  listeners.push(unsubscribe);
+}
+
+function startListeners(uid) {
+  const profileUnsubscribe = onSnapshot(
+    doc(db, "users", uid),
+    (snapshot) => {
+      if (snapshot.exists()) {
+        currentProfile = snapshot.data();
+        renderAll();
+      }
+    },
+    (error) => {
+      message(error.message, "error");
+    }
+  );
+
+  listeners.push(profileUnsubscribe);
+
+  listen("jobs", "status", "active", (data) => {
+    activeJobs = data;
+  });
+
+  listen("jobs", "createdBy", uid, (data) => {
+    myJobs = data;
+  });
+
+  listen("tasks", "submittedBy", uid, (data) => {
+    myTasks = data;
+  });
+
+  listen("deposits", "uid", uid, (data) => {
+    deposits = data;
+  });
+
+  listen("withdrawals", "uid", uid, (data) => {
+    withdrawals = data;
+  });
+}
+
+/* CREATE USER PROFILE */
+
+async function ensureUserProfile(user) {
   const ref = doc(db, "users", user.uid);
-  const snap = await getDoc(ref);
+  const snapshot = await getDoc(ref);
 
-  if (!snap.exists()) {
+  if (!snapshot.exists()) {
     await setDoc(ref, {
       uid: user.uid,
       name: user.displayName || "",
@@ -210,551 +815,58 @@ async function ensureUserDoc(user) {
   }
 }
 
-function renderTopbar() {
-  if (!currentUser) {
-    userBadge.classList.add("hidden");
-    return;
-  }
+/* AUTH STATE */
 
-  userBadge.textContent = `${getDisplayName()}${isAdmin ? " • Admin" : ""}`;
-  userBadge.classList.remove("hidden");
+onAuthStateChanged(auth, async (user) => {
+  const version = ++authVersion;
 
-  if (isAdmin) adminLink.classList.remove("hidden");
-  else adminLink.classList.add("hidden");
-}
+  stopListeners();
 
-function renderProfile() {
-  const email = currentProfile?.email || currentUser?.email || "-";
-  const balance = Number(currentProfile?.balance || 0);
-
-  profileEmail.textContent = email;
-  profileBalance.textContent = formatMoney(balance);
-
-  if (document.activeElement !== profileNameInput) {
-    profileNameInput.value = currentProfile?.name || currentUser?.displayName || "";
-  }
-}
-
-function renderStats() {
-  const cards = [
-    { label: "Balance", value: formatMoney(currentProfile?.balance || 0) },
-    { label: "Active Jobs", value: activeJobs.length },
-    { label: "My Jobs", value: myJobs.length },
-    { label: "My Tasks", value: myTasks.length },
-    { label: "Deposit Pending", value: myDeposits.filter((x) => x.status === "pending").length },
-    { label: "Withdraw Pending", value: myWithdrawals.filter((x) => x.status === "pending").length }
-  ];
-
-  dashboardStats.innerHTML = cards.map((item) => `
-    <div class="stats-card">
-      <div class="label">${escapeHtml(item.label)}</div>
-      <div class="value">${escapeHtml(String(item.value))}</div>
-    </div>
-  `).join("");
-}
-
-function renderTaskSelect() {
-  const previous = taskJobSelect.value;
-
-  if (!activeJobs.length) {
-    taskJobSelect.innerHTML = `<option value="">No active jobs available</option>`;
-    taskJobSelect.disabled = true;
-    return;
-  }
-
-  taskJobSelect.disabled = false;
-  taskJobSelect.innerHTML = `
-    <option value="">Select an active job</option>
-    ${activeJobs.map((job) => `
-      <option value="${job.id}">
-        ${escapeHtml(job.title)} — ${formatMoney(job.reward)}
-      </option>
-    `).join("")}
-  `;
-
-  if (activeJobs.some((job) => job.id === previous)) {
-    taskJobSelect.value = previous;
-  }
-}
-
-function renderActiveJobs() {
-  if (!activeJobs.length) {
-    activeJobsList.innerHTML = `<div class="empty">No active jobs yet.</div>`;
-    return;
-  }
-
-  activeJobsList.innerHTML = activeJobs.map((job) => `
-    <article class="item-card">
-      <div class="item-top">
-        <div>
-          <h4>${escapeHtml(job.title)}</h4>
-          <div class="meta">
-            <span>Reward: ${formatMoney(job.reward)}</span>
-            <span>By: ${escapeHtml(job.creatorName || job.creatorEmail || "Unknown")}</span>
-          </div>
-        </div>
-        ${statusChip(job.status)}
-      </div>
-
-      <div class="item-body">
-        <p>${escapeHtml(truncate(job.description || "", 220))}</p>
-      </div>
-
-      <div class="meta">
-        <span>Created: ${formatTime(job.createdAt)}</span>
-      </div>
-
-      <div style="margin-top:12px;">
-        <button class="btn secondary small-btn" type="button" data-use-job="${job.id}">Submit Task</button>
-      </div>
-    </article>
-  `).join("");
-}
-
-function renderMyJobs() {
-  if (!myJobs.length) {
-    myJobsList.innerHTML = `<div class="empty">You have not posted any job yet.</div>`;
-    return;
-  }
-
-  myJobsList.innerHTML = myJobs.map((job) => `
-    <article class="item-card">
-      <div class="item-top">
-        <div>
-          <h4>${escapeHtml(job.title)}</h4>
-          <div class="meta">
-            <span>Reward: ${formatMoney(job.reward)}</span>
-            <span>Created: ${formatTime(job.createdAt)}</span>
-          </div>
-        </div>
-        ${statusChip(job.status)}
-      </div>
-      <p>${escapeHtml(truncate(job.description || "", 220))}</p>
-    </article>
-  `).join("");
-}
-
-function renderMyTasks() {
-  if (!myTasks.length) {
-    myTasksList.innerHTML = `<div class="empty">No task submitted yet.</div>`;
-    return;
-  }
-
-  myTasksList.innerHTML = myTasks.map((task) => `
-    <article class="item-card">
-      <div class="item-top">
-        <div>
-          <h4>${escapeHtml(task.jobTitle || "Task")}</h4>
-          <div class="meta">
-            <span>Submitted: ${formatTime(task.createdAt)}</span>
-            <span>Owner: ${escapeHtml(task.jobOwnerName || "Unknown")}</span>
-          </div>
-        </div>
-        ${statusChip(task.status)}
-      </div>
-      <p><strong>Proof:</strong></p>
-      <p>${escapeHtml(truncate(task.proof || "", 260))}</p>
-    </article>
-  `).join("");
-}
-
-function renderDeposits() {
-  if (!myDeposits.length) {
-    depositHistoryList.innerHTML = `<div class="empty">No deposit request yet.</div>`;
-    return;
-  }
-
-  depositHistoryList.innerHTML = myDeposits.map((item) => `
-    <article class="item-card">
-      <div class="item-top">
-        <div>
-          <h4>${escapeHtml(item.method)} Deposit</h4>
-          <div class="meta">
-            <span>Amount: ${formatMoney(item.amount)}</span>
-            <span>Txn: ${escapeHtml(item.transactionId || "-")}</span>
-          </div>
-        </div>
-        ${statusChip(item.status)}
-      </div>
-      <div class="meta">
-        <span>Created: ${formatTime(item.createdAt)}</span>
-      </div>
-      ${item.note ? `<p>${escapeHtml(truncate(item.note, 200))}</p>` : ""}
-    </article>
-  `).join("");
-}
-
-function renderWithdrawals() {
-  if (!myWithdrawals.length) {
-    withdrawHistoryList.innerHTML = `<div class="empty">No withdrawal request yet.</div>`;
-    return;
-  }
-
-  withdrawHistoryList.innerHTML = myWithdrawals.map((item) => `
-    <article class="item-card">
-      <div class="item-top">
-        <div>
-          <h4>${escapeHtml(item.method)} Withdrawal</h4>
-          <div class="meta">
-            <span>Amount: ${formatMoney(item.amount)}</span>
-            <span>Account: ${escapeHtml(item.accountNumber || "-")}</span>
-          </div>
-        </div>
-        ${statusChip(item.status)}
-      </div>
-      <div class="meta">
-        <span>Created: ${formatTime(item.createdAt)}</span>
-      </div>
-      ${item.note ? `<p>${escapeHtml(truncate(item.note, 200))}</p>` : ""}
-    </article>
-  `).join("");
-}
-
-function renderAll() {
-  renderTopbar();
-  renderProfile();
-  renderStats();
-  renderTaskSelect();
-  renderActiveJobs();
-  renderMyJobs();
-  renderMyTasks();
-  renderDeposits();
-  renderWithdrawals();
-}
-
-function resetState() {
-  currentUser = null;
+  currentUser = user;
   currentProfile = null;
   isAdmin = false;
+
   activeJobs = [];
   myJobs = [];
   myTasks = [];
-  myDeposits = [];
-  myWithdrawals = [];
-  cleanListeners();
-  renderAll();
-}
-
-function attachActiveJobActions() {
-  activeJobsList.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-use-job]");
-    if (!btn) return;
-
-    const jobId = btn.dataset.useJob;
-    taskJobSelect.value = jobId;
-    showPanel("tasks");
-    document.getElementById("tasksPanel").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-}
-
-attachActiveJobActions();
-
-tabs.forEach((tab) => {
-  tab.addEventListener("click", () => showPanel(tab.dataset.panel));
-});
-
-logoutBtn.addEventListener("click", async () => {
-  try {
-    await signOut(auth);
-    setMessage("Logout successful.", "success");
-  } catch (error) {
-    setMessage(error.message, "error");
-  }
-});
-
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  try {
-    await signInWithEmailAndPassword(
-      auth,
-      loginEmail.value.trim(),
-      loginPassword.value
-    );
-    setMessage("Login successful.", "success");
-    loginForm.reset();
-  } catch (error) {
-    setMessage(`Login failed: ${error.message}`, "error");
-  }
-});
-
-registerForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  const name = regName.value.trim();
-  const email = regEmail.value.trim();
-  const password = regPassword.value;
-
-  try {
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(credential.user, { displayName: name });
-
-    await setDoc(doc(db, "users", credential.user.uid), {
-      uid: credential.user.uid,
-      name,
-      email,
-      balance: 0,
-      createdAt: serverTimestamp()
-    });
-
-    setMessage("Account created successfully.", "success");
-    registerForm.reset();
-  } catch (error) {
-    setMessage(`Registration failed: ${error.message}`, "error");
-  }
-});
-
-profileForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  if (!currentUser) return;
-
-  const name = profileNameInput.value.trim();
-
-  try {
-    await updateProfile(auth.currentUser, { displayName: name });
-    await updateDoc(doc(db, "users", currentUser.uid), {
-      name
-    });
-    setMessage("Profile updated successfully.", "success");
-  } catch (error) {
-    setMessage(`Profile update failed: ${error.message}`, "error");
-  }
-});
-
-jobForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  if (!currentUser) return;
-
-  const title = jobTitle.value.trim();
-  const description = jobDescription.value.trim();
-  const reward = Number(jobReward.value);
-
-  if (!title || !description || !Number.isFinite(reward) || reward <= 0) {
-    setMessage("Please enter valid job data.", "error");
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "jobs"), {
-      title,
-      description,
-      reward,
-      createdBy: currentUser.uid,
-      creatorName: getDisplayName(),
-      creatorEmail: currentUser.email || "",
-      status: "pending",
-      createdAt: serverTimestamp()
-    });
-
-    jobForm.reset();
-    setMessage("Job submitted. Waiting for admin approval.", "success");
-  } catch (error) {
-    setMessage(`Job submit failed: ${error.message}`, "error");
-  }
-});
-
-taskForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  if (!currentUser) return;
-
-  const jobId = taskJobSelect.value;
-  const proof = taskProof.value.trim();
-
-  if (!jobId || !proof) {
-    setMessage("Please select a job and write proof.", "error");
-    return;
-  }
-
-  const selectedJob = activeJobs.find((job) => job.id === jobId);
-  if (!selectedJob) {
-    setMessage("Selected job not found or no longer active.", "error");
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "tasks"), {
-      jobId: selectedJob.id,
-      jobTitle: selectedJob.title,
-      jobOwnerUid: selectedJob.createdBy,
-      jobOwnerName: selectedJob.creatorName || selectedJob.creatorEmail || "Unknown",
-      submittedBy: currentUser.uid,
-      submittedByName: getDisplayName(),
-      proof,
-      status: "pending",
-      createdAt: serverTimestamp()
-    });
-
-    taskProof.value = "";
-    setMessage("Task submitted. Waiting for admin approval.", "success");
-  } catch (error) {
-    setMessage(`Task submit failed: ${error.message}`, "error");
-  }
-});
-
-depositForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  if (!currentUser) return;
-
-  const amount = Number(depositAmount.value);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    setMessage("Enter a valid deposit amount.", "error");
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "deposits"), {
-      uid: currentUser.uid,
-      name: getDisplayName(),
-      email: currentUser.email || "",
-      method: depositMethod.value,
-      amount,
-      transactionId: depositTxn.value.trim(),
-      note: depositNote.value.trim(),
-      status: "pending",
-      createdAt: serverTimestamp()
-    });
-
-    depositForm.reset();
-    setMessage("Deposit request sent. Waiting for admin approval.", "success");
-  } catch (error) {
-    setMessage(`Deposit request failed: ${error.message}`, "error");
-  }
-});
-
-withdrawForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearMessage();
-
-  if (!currentUser) return;
-
-  const amount = Number(withdrawAmount.value);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    setMessage("Enter a valid withdraw amount.", "error");
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "withdrawals"), {
-      uid: currentUser.uid,
-      name: getDisplayName(),
-      email: currentUser.email || "",
-      method: withdrawMethod.value,
-      amount,
-      accountNumber: withdrawAccount.value.trim(),
-      note: withdrawNote.value.trim(),
-      status: "pending",
-      createdAt: serverTimestamp()
-    });
-
-    withdrawForm.reset();
-    setMessage("Withdrawal request sent. Waiting for admin approval.", "success");
-  } catch (error) {
-    setMessage(`Withdraw request failed: ${error.message}`, "error");
-  }
-});
-
-async function bindDataListeners(uid) {
-  const profileUnsub = onSnapshot(doc(db, "users", uid), (snap) => {
-    if (snap.exists()) {
-      currentProfile = snap.data();
-      renderAll();
-    }
-  }, (error) => setMessage(error.message, "error"));
-  listenRef(profileUnsub);
-
-  const activeJobsUnsub = onSnapshot(
-    query(collection(db, "jobs"), where("status", "==", "active")),
-    (snap) => {
-      activeJobs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
-      renderAll();
-    },
-    (error) => setMessage(error.message, "error")
-  );
-  listenRef(activeJobsUnsub);
-
-  const myJobsUnsub = onSnapshot(
-    query(collection(db, "jobs"), where("createdBy", "==", uid)),
-    (snap) => {
-      myJobs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
-      renderAll();
-    },
-    (error) => setMessage(error.message, "error")
-  );
-  listenRef(myJobsUnsub);
-
-  const myTasksUnsub = onSnapshot(
-    query(collection(db, "tasks"), where("submittedBy", "==", uid)),
-    (snap) => {
-      myTasks = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
-      renderAll();
-    },
-    (error) => setMessage(error.message, "error")
-  );
-  listenRef(myTasksUnsub);
-
-  const depositsUnsub = onSnapshot(
-    query(collection(db, "deposits"), where("uid", "==", uid)),
-    (snap) => {
-      myDeposits = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
-      renderAll();
-    },
-    (error) => setMessage(error.message, "error")
-  );
-  listenRef(depositsUnsub);
-
-  const withdrawalsUnsub = onSnapshot(
-    query(collection(db, "withdrawals"), where("uid", "==", uid)),
-    (snap) => {
-      myWithdrawals = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
-      renderAll();
-    },
-    (error) => setMessage(error.message, "error")
-  );
-  listenRef(withdrawalsUnsub);
-}
-
-onAuthStateChanged(auth, async (user) => {
-  cleanListeners();
+  deposits = [];
+  withdrawals = [];
 
   if (!user) {
-    resetState();
-    showAuthView();
+    $("authView").classList.remove("hidden");
+    $("appView").classList.add("hidden");
+    $("adminLink").classList.add("hidden");
+
     return;
   }
 
-  currentUser = user;
-
   try {
-    await ensureUserDoc(user);
+    await ensureUserProfile(user);
   } catch (error) {
-    setMessage(`Profile setup failed: ${error.message}`, "error");
+    console.error("Profile setup:", error);
   }
+
+  if (version !== authVersion) return;
 
   try {
     const token = await getIdTokenResult(user, true);
-    isAdmin = !!token.claims.admin;
+
+    isAdmin = token.claims.admin === true;
+
   } catch (error) {
-    console.warn("Admin token check failed:", error);
-    isAdmin = false;
+    console.error("Admin check:", error);
   }
 
-  await bindDataListeners(user.uid);
-  showAppView();
+  if (version !== authVersion) return;
+
+  $("adminLink").classList.toggle("hidden", !isAdmin);
+
+  $("authView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+
   showPanel("dashboard");
+
+  startListeners(user.uid);
+
   renderAll();
 });
