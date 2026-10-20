@@ -1,7 +1,7 @@
 /* ==========================================
    MICRO JOB ADMIN PANEL
-   HISTORY SYSTEM - TESTING MODE
-   Firebase SDK 10.12.5
+   HISTORY + WORKER DETAILS
+   FIREBASE SPARK TESTING MODE
 ========================================== */
 
 import {
@@ -31,11 +31,13 @@ import {
 
 
 /* ==========================================
-   FIREBASE
+   FIREBASE INITIALIZATION
 ========================================== */
 
 const app = initializeApp(firebaseConfig);
+
 const auth = getAuth(app);
+
 const db = getFirestore(app);
 
 const $ = id => document.getElementById(id);
@@ -44,13 +46,21 @@ const MIN_DEPOSIT = 300;
 
 
 /* ==========================================
-   STATE
+   APPLICATION STATE
 ========================================== */
 
 let currentAdmin = null;
+
 let listeners = [];
+
 let authVersion = 0;
+
 let busy = false;
+
+let usersLoaded = false;
+
+let activeTab = "jobs";
+
 
 const records = {
   jobs: [],
@@ -60,12 +70,14 @@ const records = {
   users: []
 };
 
+
 const filters = {
   jobs: "pending",
   tasks: "pending",
   deposits: "pending",
   withdrawals: "pending"
 };
+
 
 const settings = {
   jobs: {
@@ -99,7 +111,7 @@ const settings = {
 
 
 /* ==========================================
-   HELPERS
+   BASIC HELPERS
 ========================================== */
 
 function escapeHtml(value = "") {
@@ -115,6 +127,7 @@ function escapeHtml(value = "") {
   );
 }
 
+
 function text(value) {
   if (
     value === null ||
@@ -124,54 +137,40 @@ function text(value) {
     return "—";
   }
 
-  return escapeHtml(value);
+  return escapeHtml(String(value));
 }
 
-function money(value) {
-  const number = Number(value) || 0;
 
-  return "৳ " + number.toLocaleString("en-BD", {
+function money(value) {
+  const amount = Number(value) || 0;
+
+  return "৳ " + amount.toLocaleString("en-BD", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
 }
 
+
 function dateText(value) {
   if (!value) return "—";
 
   try {
-    const date = value.toDate
-      ? value.toDate()
-      : value.seconds
-        ? new Date(value.seconds * 1000)
-        : null;
+    const date =
+      typeof value.toDate === "function"
+        ? value.toDate()
+        : value.seconds
+          ? new Date(value.seconds * 1000)
+          : null;
 
     return date
       ? date.toLocaleString("bn-BD")
       : "—";
 
-  } catch {
+  } catch (error) {
     return "—";
   }
 }
 
-function statusChip(status) {
-  const safe = escapeHtml(status || "pending");
-
-  return `
-    <span class="status-chip ${safe}">
-      ${safe}
-    </span>
-  `;
-}
-
-function emptyState(message) {
-  return `
-    <div class="empty-state">
-      ${escapeHtml(message)}
-    </div>
-  `;
-}
 
 function row(label, value) {
   return `
@@ -182,14 +181,52 @@ function row(label, value) {
   `;
 }
 
-function message(value, type = "success") {
+
+function statusChip(status = "pending") {
+  const safeStatus = escapeHtml(status);
+
+  return `
+    <span class="status-chip ${safeStatus}">
+      ${safeStatus}
+    </span>
+  `;
+}
+
+
+function emptyState(message) {
+  return `
+    <div class="empty-state">
+      ${escapeHtml(message)}
+    </div>
+  `;
+}
+
+
+function sortNewest(items) {
+  return [...items].sort((a, b) => {
+    const first = a.createdAt?.seconds || 0;
+
+    const second = b.createdAt?.seconds || 0;
+
+    return second - first;
+  });
+}
+
+
+/* ==========================================
+   MESSAGES
+========================================== */
+
+function setMessage(value, type = "success") {
   const element = $("adminMessage");
 
   if (!element) return;
 
   element.textContent = value;
+
   element.className = "message " + type;
 }
+
 
 function clearMessage() {
   const element = $("adminMessage");
@@ -197,33 +234,45 @@ function clearMessage() {
   if (!element) return;
 
   element.textContent = "";
+
   element.className = "message hidden";
 }
 
+
 function loginMessage(value) {
-  $("adminLoginMessage").textContent = value;
+  const element = $("adminLoginMessage");
+
+  if (element) {
+    element.textContent = value;
+  }
 }
+
+
+/* ==========================================
+   AUTHENTICATION VIEWS
+========================================== */
 
 function showLogin() {
   $("adminLoginView").style.display = "flex";
+
   $("adminDashboardView").style.display = "none";
+
   $("adminLogoutBtn").style.display = "none";
 }
 
+
 function showDashboard() {
   $("adminLoginView").style.display = "none";
+
   $("adminDashboardView").style.display = "block";
+
   $("adminLogoutBtn").style.display = "inline-flex";
 }
 
-function sortNewest(items) {
-  return [...items].sort((a, b) => {
-    const aTime = a.createdAt?.seconds || 0;
-    const bTime = b.createdAt?.seconds || 0;
 
-    return bTime - aTime;
-  });
-}
+/* ==========================================
+   LISTENER MANAGEMENT
+========================================== */
 
 function stopListeners() {
   listeners.forEach(unsubscribe => {
@@ -237,18 +286,22 @@ function stopListeners() {
   listeners = [];
 }
 
+
 function resetData() {
-  Object.keys(records).forEach(key => {
-    records[key] = [];
+  Object.keys(records).forEach(name => {
+    records[name] = [];
   });
 
+  usersLoaded = false;
+
   updateCounts();
+
   renderAll();
 }
 
 
 /* ==========================================
-   LOGIN
+   LOGIN FORM
 ========================================== */
 
 $("adminLoginForm").addEventListener(
@@ -257,6 +310,7 @@ $("adminLoginForm").addEventListener(
     event.preventDefault();
 
     const email = $("adminEmail").value.trim();
+
     const password = $("adminPassword").value;
 
     const button = $("adminLoginForm").querySelector(
@@ -265,10 +319,12 @@ $("adminLoginForm").addEventListener(
 
     if (!email || !password) {
       loginMessage("ইমেইল ও পাসওয়ার্ড লিখুন।");
+
       return;
     }
 
     button.disabled = true;
+
     loginMessage("লগইন হচ্ছে...");
 
     try {
@@ -278,9 +334,13 @@ $("adminLoginForm").addEventListener(
         password
       );
 
-      loginMessage("Admin অনুমতি যাচাই হচ্ছে...");
+      loginMessage(
+        "Admin অনুমতি যাচাই করা হচ্ছে..."
+      );
 
     } catch (error) {
+      console.error(error);
+
       loginMessage(
         "লগইন ব্যর্থ হয়েছে: " + error.message
       );
@@ -303,14 +363,17 @@ $("adminLogoutBtn").addEventListener(
       await signOut(auth);
 
     } catch (error) {
-      message(error.message, "error");
+      setMessage(
+        "Logout ব্যর্থ: " + error.message,
+        "error"
+      );
     }
   }
 );
 
 
 /* ==========================================
-   AUTH + ADMIN CLAIM
+   VERIFY ADMIN CUSTOM CLAIM
 ========================================== */
 
 onAuthStateChanged(
@@ -319,26 +382,34 @@ onAuthStateChanged(
     const version = ++authVersion;
 
     stopListeners();
+
     currentAdmin = null;
+
     resetData();
+
     clearMessage();
 
     if (!user) {
       showLogin();
+
       return;
     }
 
-    loginMessage("Admin অনুমতি যাচাই হচ্ছে...");
+    loginMessage(
+      "Admin অনুমতি যাচাই হচ্ছে..."
+    );
 
     try {
-      const token = await getIdTokenResult(
+      const tokenResult = await getIdTokenResult(
         user,
         true
       );
 
-      if (version !== authVersion) return;
+      if (version !== authVersion) {
+        return;
+      }
 
-      if (token.claims.admin !== true) {
+      if (tokenResult.claims.admin !== true) {
         showLogin();
 
         loginMessage(
@@ -346,23 +417,30 @@ onAuthStateChanged(
         );
 
         await signOut(auth);
+
         return;
       }
 
       currentAdmin = user;
 
       loginMessage("");
+
       showDashboard();
 
       startListeners();
 
     } catch (error) {
-      if (version !== authVersion) return;
+      console.error(error);
+
+      if (version !== authVersion) {
+        return;
+      }
 
       showLogin();
 
       loginMessage(
-        "Admin যাচাই ব্যর্থ: " + error.message
+        "Admin যাচাই করা যায়নি: " +
+        error.message
       );
     }
   }
@@ -381,6 +459,7 @@ const panels = {
   users: "adminUsersPanel"
 };
 
+
 document.querySelectorAll(
   "[data-admin-tab]"
 ).forEach(button => {
@@ -388,6 +467,8 @@ document.querySelectorAll(
     const selected = button.dataset.adminTab;
 
     if (!panels[selected]) return;
+
+    activeTab = selected;
 
     document.querySelectorAll(
       "[data-admin-tab]"
@@ -399,15 +480,82 @@ document.querySelectorAll(
     });
 
     Object.entries(panels).forEach(
-      ([name, id]) => {
-        $(id).style.display =
-          name === selected
-            ? "block"
-            : "none";
+      ([name, panelId]) => {
+        const panel = $(panelId);
+
+        if (panel) {
+          panel.style.display =
+            name === selected
+              ? "block"
+              : "none";
+        }
       }
     );
   });
 });
+
+
+/* ==========================================
+   DYNAMIC HISTORY HEADINGS
+========================================== */
+
+function updatePanelHeading(name) {
+  const config = settings[name];
+
+  if (!config) return;
+
+  const panel = $(config.panel);
+
+  if (!panel) return;
+
+  const heading = panel.querySelector(
+    ".panel-heading h2"
+  );
+
+  const description = panel.querySelector(
+    ".panel-heading p"
+  );
+
+  if (!heading) return;
+
+  const selected = filters[name];
+
+  const labels = {
+    pending: "Pending",
+    approved: "Approved",
+    rejected: "Rejected",
+    all: "All"
+  };
+
+  const descriptions = {
+    pending: "অনুমোদনের অপেক্ষায় থাকা রিকোয়েস্টগুলো দেখুন।",
+    approved: "আগে অনুমোদিত রিকোয়েস্টগুলো দেখুন।",
+    rejected: "আগে বাতিল করা রিকোয়েস্টগুলো দেখুন।",
+    all: "সব রিকোয়েস্টের বর্তমান Status ও বিস্তারিত দেখুন।"
+  };
+
+  const iconNames = {
+    jobs: "fa-briefcase",
+    tasks: "fa-list-check",
+    deposits: "fa-wallet",
+    withdrawals: "fa-money-bill-transfer"
+  };
+
+  const title =
+    selected === "all"
+      ? "All " + config.title + " History"
+      : labels[selected] + " " + config.title;
+
+  heading.innerHTML = `
+    <i class="fa-solid ${iconNames[name]}"></i>
+    ${escapeHtml(title)}
+  `;
+
+  if (description) {
+    description.textContent =
+      descriptions[selected];
+  }
+}
 
 
 /* ==========================================
@@ -416,13 +564,23 @@ document.querySelectorAll(
 
 function createHistoryFilters() {
   Object.entries(settings).forEach(
-    ([collectionName, config]) => {
+    ([name, config]) => {
       const panel = $(config.panel);
+
       const list = $(config.list);
 
       if (!panel || !list) return;
 
-      const wrapper = document.createElement("div");
+      const existing = panel.querySelector(
+        ".history-filters"
+      );
+
+      if (existing) {
+        existing.remove();
+      }
+
+      const wrapper =
+        document.createElement("div");
 
       wrapper.className = "history-filters";
 
@@ -437,8 +595,8 @@ function createHistoryFilters() {
       wrapper.innerHTML = `
         <button
           type="button"
-          class="history-filter active"
-          data-history-collection="${collectionName}"
+          class="history-filter"
+          data-history-collection="${name}"
           data-history-status="pending"
         >
           Pending
@@ -447,7 +605,7 @@ function createHistoryFilters() {
         <button
           type="button"
           class="history-filter"
-          data-history-collection="${collectionName}"
+          data-history-collection="${name}"
           data-history-status="approved"
         >
           Approved
@@ -456,7 +614,7 @@ function createHistoryFilters() {
         <button
           type="button"
           class="history-filter"
-          data-history-collection="${collectionName}"
+          data-history-collection="${name}"
           data-history-status="rejected"
         >
           Rejected
@@ -465,7 +623,7 @@ function createHistoryFilters() {
         <button
           type="button"
           class="history-filter"
-          data-history-collection="${collectionName}"
+          data-history-collection="${name}"
           data-history-status="all"
         >
           All History
@@ -474,11 +632,9 @@ function createHistoryFilters() {
 
       panel.insertBefore(wrapper, list);
 
-      const buttons = wrapper.querySelectorAll(
+      wrapper.querySelectorAll(
         ".history-filter"
-      );
-
-      buttons.forEach(button => {
+      ).forEach(button => {
         button.style.cssText = `
           border:1px solid #e2e8f0;
           background:white;
@@ -488,15 +644,18 @@ function createHistoryFilters() {
           font-size:13px;
           font-weight:700;
           white-space:nowrap;
-          cursor:pointer;
           flex-shrink:0;
+          cursor:pointer;
         `;
       });
 
-      setFilterStyle(wrapper, "pending");
+      setFilterStyle(wrapper, filters[name]);
+
+      updatePanelHeading(name);
     }
   );
 }
+
 
 function setFilterStyle(wrapper, selected) {
   wrapper.querySelectorAll(
@@ -516,6 +675,7 @@ function setFilterStyle(wrapper, selected) {
   });
 }
 
+
 document.addEventListener(
   "click",
   event => {
@@ -525,8 +685,11 @@ document.addEventListener(
 
     if (!button) return;
 
-    const name = button.dataset.historyCollection;
-    const status = button.dataset.historyStatus;
+    const name =
+      button.dataset.historyCollection;
+
+    const status =
+      button.dataset.historyStatus;
 
     if (!settings[name]) return;
 
@@ -546,13 +709,15 @@ document.addEventListener(
       status
     );
 
+    updatePanelHeading(name);
+
     renderCollection(name);
   }
 );
 
 
 /* ==========================================
-   COUNTS
+   STATISTICS
 ========================================== */
 
 function updateCounts() {
@@ -562,7 +727,11 @@ function updateCounts() {
         item => item.status === "pending"
       ).length;
 
-      $(config.count).textContent = count;
+      const element = $(config.count);
+
+      if (element) {
+        element.textContent = count;
+      }
     }
   );
 
@@ -572,7 +741,7 @@ function updateCounts() {
 
 
 /* ==========================================
-   FIRESTORE LISTENERS
+   FIRESTORE LIVE DATA
 ========================================== */
 
 function startListeners() {
@@ -596,13 +765,17 @@ function startListeners() {
         );
 
         updateCounts();
+
         renderCollection(name);
       },
 
       error => {
-        console.error(name, error);
+        console.error(
+          name + " listener error:",
+          error
+        );
 
-        message(
+        setMessage(
           name + " লোড হয়নি: " +
           error.message,
           "error"
@@ -610,7 +783,7 @@ function startListeners() {
 
         $(settings[name].list).innerHTML =
           emptyState(
-            "History লোড করতে সমস্যা হয়েছে: " +
+            "ডেটা লোড করা যাচ্ছে না: " +
             error.message
           );
       }
@@ -618,6 +791,7 @@ function startListeners() {
 
     listeners.push(unsubscribe);
   });
+
 
   const usersListener = onSnapshot(
     collection(db, "users"),
@@ -630,18 +804,39 @@ function startListeners() {
         }))
       );
 
+      usersLoaded = true;
+
       updateCounts();
+
       renderUsers();
+
+      /*
+        Re-render Tasks after Users load,
+        so Worker details can be matched.
+      */
+
+      renderCollection("tasks");
     },
 
     error => {
-      console.error(error);
+      console.error(
+        "Users listener error:",
+        error
+      );
+
+      usersLoaded = false;
 
       $("adminUsersList").innerHTML =
         emptyState(
-          "Users লোড করতে সমস্যা হয়েছে: " +
+          "Users লোড হয়নি: " +
           error.message
         );
+
+      setMessage(
+        "Users লোড করতে সমস্যা হয়েছে: " +
+        error.message,
+        "error"
+      );
     }
   );
 
@@ -650,7 +845,85 @@ function startListeners() {
 
 
 /* ==========================================
-   FILTER LOGIC
+   WORKER INFORMATION RESOLVER
+========================================== */
+
+function findWorker(task) {
+  /*
+    Tasks may use different field names.
+    The current project also creates
+    deterministic IDs:
+
+    jobId_workerUid
+
+    We check known fields first,
+    then recover UID from the document ID.
+  */
+
+  let workerUid =
+    task.uid ||
+    task.workerId ||
+    task.workerUid ||
+    task.userId ||
+    task.createdBy ||
+    "";
+
+  /*
+    Recover UID from task document ID
+    when the stored worker UID is absent.
+  */
+
+  if (
+    !workerUid &&
+    typeof task.id === "string" &&
+    typeof task.jobId === "string"
+  ) {
+    const prefix = task.jobId + "_";
+
+    if (task.id.startsWith(prefix)) {
+      workerUid = task.id.slice(
+        prefix.length
+      );
+    }
+  }
+
+  /*
+    Match registered user's document ID.
+  */
+
+  const matchedUser = records.users.find(
+    user =>
+      user.id === workerUid ||
+      user.uid === workerUid
+  );
+
+  const workerName =
+    task.workerName ||
+    task.name ||
+    task.userName ||
+    task.workerDisplayName ||
+    matchedUser?.name ||
+    matchedUser?.displayName ||
+    "";
+
+  const workerEmail =
+    task.workerEmail ||
+    task.email ||
+    task.userEmail ||
+    matchedUser?.email ||
+    "";
+
+  return {
+    uid: workerUid,
+    name: workerName,
+    email: workerEmail,
+    foundUser: Boolean(matchedUser)
+  };
+}
+
+
+/* ==========================================
+   FILTER RECORDS
 ========================================== */
 
 function getFilteredData(name) {
@@ -659,6 +932,10 @@ function getFilteredData(name) {
   if (selected === "all") {
     return records[name];
   }
+
+  /*
+    Approved jobs use status "active".
+  */
 
   if (
     name === "jobs" &&
@@ -691,6 +968,7 @@ function actionButtons(
     return `
       <div class="admin-actions">
         ${statusChip(status)}
+
         <span style="
           color:#64748b;
           font-size:13px;
@@ -702,6 +980,7 @@ function actionButtons(
   }
 
   const safeName = escapeHtml(name);
+
   const safeId = escapeHtml(id);
 
   return `
@@ -749,6 +1028,7 @@ function jobCard(job) {
     <article class="admin-item">
 
       <div class="admin-item-header">
+
         <div>
           <h3 class="admin-item-title">
             ${text(job.title)}
@@ -760,19 +1040,34 @@ function jobCard(job) {
         </div>
 
         ${statusChip(job.status)}
+
       </div>
 
       <div class="admin-item-body">
 
-        ${row("Posted By", job.creatorName)}
+        ${row(
+          "Posted By",
+          job.creatorName
+        )}
 
-        ${row("Email", job.creatorEmail)}
+        ${row(
+          "Email",
+          job.creatorEmail
+        )}
 
-        ${row("Reward", money(job.reward))}
+        ${row(
+          "Reward",
+          money(job.reward)
+        )}
 
-        ${row("Job ID", job.id)}
+        ${row(
+          "Job ID",
+          job.id
+        )}
 
-        <p><strong>Description:</strong></p>
+        <p>
+          <strong>Description:</strong>
+        </p>
 
         <div class="long-text">
           ${text(job.description)}
@@ -792,15 +1087,32 @@ function jobCard(job) {
 
 
 /* ==========================================
-   TASK CARD
+   TASK CARD WITH WORKER DETAILS
 ========================================== */
 
 function taskCard(task) {
+  const worker = findWorker(task);
+
+  const workerName = worker.name ||
+    (usersLoaded
+      ? "তথ্য পাওয়া যায়নি"
+      : "লোড হচ্ছে...");
+
+  const workerEmail = worker.email ||
+    (usersLoaded
+      ? "তথ্য পাওয়া যায়নি"
+      : "লোড হচ্ছে...");
+
+  const workerUid = worker.uid ||
+    "তথ্য পাওয়া যায়নি";
+
   return `
     <article class="admin-item">
 
       <div class="admin-item-header">
+
         <div>
+
           <h3 class="admin-item-title">
             ${text(task.jobTitle)}
           </h3>
@@ -808,36 +1120,43 @@ function taskCard(task) {
           <div class="admin-item-subtitle">
             ${dateText(task.createdAt)}
           </div>
+
         </div>
 
         ${statusChip(task.status)}
+
       </div>
 
       <div class="admin-item-body">
 
         ${row(
           "Worker",
-          task.workerName ||
-          task.name ||
-          task.userName
+          workerName
         )}
 
         ${row(
           "Email",
-          task.workerEmail ||
-          task.email ||
-          task.userEmail
+          workerEmail
         )}
 
         ${row(
           "Worker UID",
-          task.uid ||
-          task.workerId
+          workerUid
         )}
 
-        ${row("Job ID", task.jobId)}
+        ${row(
+          "Job ID",
+          task.jobId
+        )}
 
-        <p><strong>Proof:</strong></p>
+        ${row(
+          "Task ID",
+          task.id
+        )}
+
+        <p>
+          <strong>Proof:</strong>
+        </p>
 
         <div class="long-text">
           ${text(task.proof)}
@@ -865,7 +1184,9 @@ function depositCard(deposit) {
     <article class="admin-item">
 
       <div class="admin-item-header">
+
         <div>
+
           <h3 class="admin-item-title">
             ${money(deposit.amount)}
           </h3>
@@ -873,35 +1194,53 @@ function depositCard(deposit) {
           <div class="admin-item-subtitle">
             ${dateText(deposit.createdAt)}
           </div>
+
         </div>
 
         ${statusChip(deposit.status)}
+
       </div>
 
       <div class="admin-item-body">
 
-        ${row("User", deposit.name)}
+        ${row(
+          "User",
+          deposit.name
+        )}
 
-        ${row("Email", deposit.email)}
+        ${row(
+          "Email",
+          deposit.email
+        )}
 
-        ${row("Method", deposit.method)}
+        ${row(
+          "Method",
+          deposit.method
+        )}
 
         ${row(
           "Transaction ID",
           deposit.transactionId
         )}
 
-        ${row("User UID", deposit.uid)}
+        ${row(
+          "User UID",
+          deposit.uid
+        )}
 
-        ${row("Note", deposit.note)}
+        ${row(
+          "Note",
+          deposit.note
+        )}
 
       </div>
 
       <div class="testing-warning">
-        এটি Testing Mode। Deposit Approve
-        করলে Lifetime Work Access চালু
-        হতে পারে, কিন্তু বাস্তব টাকা বা
-        ব্যালেন্স যোগ হবে না।
+        <i class="fa-solid fa-circle-info"></i>
+        Testing Mode: অনুমোদিত Test Deposit
+        ব্যবহারকারীর Lifetime Work Access
+        চালু করতে পারে। কোনো বাস্তব টাকা
+        বা ব্যালেন্স যোগ হয় না।
       </div>
 
       ${actionButtons(
@@ -925,7 +1264,9 @@ function withdrawalCard(item) {
     <article class="admin-item">
 
       <div class="admin-item-header">
+
         <div>
+
           <h3 class="admin-item-title">
             ${money(item.amount)}
           </h3>
@@ -933,28 +1274,45 @@ function withdrawalCard(item) {
           <div class="admin-item-subtitle">
             ${dateText(item.createdAt)}
           </div>
+
         </div>
 
         ${statusChip(item.status)}
+
       </div>
 
       <div class="admin-item-body">
 
-        ${row("User", item.name)}
+        ${row(
+          "User",
+          item.name
+        )}
 
-        ${row("Email", item.email)}
+        ${row(
+          "Email",
+          item.email
+        )}
 
-        ${row("Method", item.method)}
+        ${row(
+          "Method",
+          item.method
+        )}
 
-        ${row("Account", item.account)}
+        ${row(
+          "Account",
+          item.account
+        )}
 
-        ${row("Note", item.note)}
+        ${row(
+          "Note",
+          item.note
+        )}
 
       </div>
 
       <div class="testing-warning">
-        Testing Mode-এ Withdrawal
-        Approval ও বাস্তব পেমেন্ট বন্ধ।
+        Testing Mode-এ Withdrawal Approval
+        ও বাস্তব পেমেন্ট বন্ধ।
       </div>
 
       ${actionButtons(
@@ -970,7 +1328,7 @@ function withdrawalCard(item) {
 
 
 /* ==========================================
-   RENDER HISTORY
+   RENDER COLLECTION
 ========================================== */
 
 function renderCollection(name) {
@@ -979,16 +1337,19 @@ function renderCollection(name) {
   if (!config) return;
 
   const container = $(config.list);
+
+  if (!container) return;
+
   const data = getFilteredData(name);
 
   if (!data.length) {
-    const status = filters[name];
+    const selected = filters[name];
 
     container.innerHTML = emptyState(
-      status === "all"
+      selected === "all"
         ? "কোনো History পাওয়া যায়নি।"
         : "কোনো " +
-          status.toUpperCase() +
+          selected.toUpperCase() +
           " " +
           config.title +
           " নেই।"
@@ -1010,7 +1371,7 @@ function renderCollection(name) {
 
 
 /* ==========================================
-   USERS
+   RENDER REGISTERED USERS
 ========================================== */
 
 function renderUsers() {
@@ -1018,7 +1379,7 @@ function renderUsers() {
 
   if (!records.users.length) {
     container.innerHTML = emptyState(
-      "কোনো User পাওয়া যায়নি।"
+      "কোনো Registered User পাওয়া যায়নি।"
     );
 
     return;
@@ -1034,7 +1395,10 @@ function renderUsers() {
 
         <div class="admin-item-body">
 
-          ${row("Email", user.email)}
+          ${row(
+            "Email",
+            user.email
+          )}
 
           ${row(
             "UID",
@@ -1062,9 +1426,14 @@ function renderUsers() {
     `).join("");
 }
 
+
+/* ==========================================
+   RENDER ALL
+========================================== */
+
 function renderAll() {
   Object.keys(settings).forEach(
-    renderCollection
+    name => renderCollection(name)
   );
 
   renderUsers();
@@ -1072,7 +1441,7 @@ function renderAll() {
 
 
 /* ==========================================
-   SECURE STATUS TRANSACTION
+   FIRESTORE STATUS TRANSACTION
 ========================================== */
 
 async function updateStatus(
@@ -1086,18 +1455,18 @@ async function updateStatus(
     );
   }
 
-  if (!settings[name]) {
-    throw new Error(
-      "Invalid collection."
-    );
-  }
-
   const expectedStatuses = {
     jobs: ["active", "rejected"],
     tasks: ["approved", "rejected"],
     deposits: ["approved", "rejected"],
     withdrawals: ["rejected"]
   };
+
+  if (!expectedStatuses[name]) {
+    throw new Error(
+      "Invalid collection."
+    );
+  }
 
   if (!expectedStatuses[name].includes(
     newStatus
@@ -1107,7 +1476,11 @@ async function updateStatus(
     );
   }
 
-  const reference = doc(db, name, id);
+  const reference = doc(
+    db,
+    name,
+    id
+  );
 
   await runTransaction(
     db,
@@ -1130,24 +1503,27 @@ async function updateStatus(
       }
 
       /*
-        Jobs, Tasks, Withdrawals
-        and Deposit Rejection:
-        STATUS CHANGE ONLY
+        Normal status update:
+        Jobs, Tasks, Withdrawals,
+        and Deposit Rejection.
       */
 
       if (
         name !== "deposits" ||
         newStatus === "rejected"
       ) {
-        transaction.update(reference, {
-          status: newStatus
-        });
+        transaction.update(
+          reference,
+          {
+            status: newStatus
+          }
+        );
 
         return;
       }
 
       /*
-        TEST DEPOSIT APPROVAL
+        Test Deposit Approval.
       */
 
       const amount = Number(data.amount);
@@ -1157,7 +1533,7 @@ async function updateStatus(
         amount < MIN_DEPOSIT
       ) {
         throw new Error(
-          "ন্যূনতম ৳৩০০ Deposit প্রয়োজন।"
+          "কমপক্ষে ৳৩০০ Deposit প্রয়োজন।"
         );
       }
 
@@ -1177,8 +1553,8 @@ async function updateStatus(
       );
 
       /*
-        Firestore requires all reads
-        before transaction writes.
+        Complete Firestore reads
+        before writes.
       */
 
       const accessSnapshot =
@@ -1195,13 +1571,21 @@ async function updateStatus(
         );
       }
 
-      transaction.update(reference, {
-        status: "approved"
-      });
+      /*
+        Approve test deposit.
+        No balance credit.
+      */
+
+      transaction.update(
+        reference,
+        {
+          status: "approved"
+        }
+      );
 
       /*
         First approval creates
-        lifetime activation.
+        permanent work access.
       */
 
       if (!accessSnapshot.exists()) {
@@ -1220,7 +1604,7 @@ async function updateStatus(
 
 
 /* ==========================================
-   APPROVE / REJECT HANDLER
+   APPROVE / REJECT BUTTON HANDLER
 ========================================== */
 
 document.addEventListener(
@@ -1233,13 +1617,17 @@ document.addEventListener(
     if (!button || busy) return;
 
     const action = button.dataset.action;
+
     const name = button.dataset.collection;
+
     const id = button.dataset.id;
 
-    if (
-      !["approve", "reject"].includes(action) ||
-      !settings[name]
-    ) {
+    if (!settings[name]) return;
+
+    if (![
+      "approve",
+      "reject"
+    ].includes(action)) {
       return;
     }
 
@@ -1259,15 +1647,15 @@ document.addEventListener(
       name === "withdrawals" &&
       action === "approve"
     ) {
-      message(
-        "Withdrawal Approval বন্ধ।",
+      setMessage(
+        "Testing Mode-এ Withdrawal Approval বন্ধ।",
         "error"
       );
 
       return;
     }
 
-    let confirmText =
+    let confirmationText =
       "আপনি কি এই রিকোয়েস্ট " +
       (action === "approve"
         ? "Approve"
@@ -1278,11 +1666,12 @@ document.addEventListener(
       name === "deposits" &&
       action === "approve"
     ) {
-      confirmText =
+      confirmationText =
         "TEST DEPOSIT APPROVAL\n\n" +
-        "এতে Lifetime Work Access " +
-        "চালু হতে পারে।\n\n" +
-        "কোনো বাস্তব ব্যালেন্স যোগ হবে না।\n\n" +
+        "Approve করলে ব্যবহারকারীর " +
+        "Lifetime Work Access চালু হতে পারে।\n\n" +
+        "কোনো বাস্তব টাকা বা ব্যালেন্স " +
+        "যোগ হবে না।\n\n" +
         "আপনি কি নিশ্চিত?";
     }
 
@@ -1290,17 +1679,20 @@ document.addEventListener(
       name === "tasks" &&
       action === "approve"
     ) {
-      confirmText =
+      confirmationText =
         "Task Approve করবেন?\n\n" +
         "Testing Mode-এ Worker Balance " +
         "পরিবর্তন হবে না।";
     }
 
-    if (!window.confirm(confirmText)) {
+    if (!window.confirm(
+      confirmationText
+    )) {
       return;
     }
 
     busy = true;
+
     button.disabled = true;
 
     clearMessage();
@@ -1312,7 +1704,7 @@ document.addEventListener(
         newStatus
       );
 
-      message(
+      setMessage(
         "রিকোয়েস্ট সফলভাবে " +
         (newStatus === "active"
           ? "Active"
@@ -1327,10 +1719,14 @@ document.addEventListener(
       });
 
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Admin action error:",
+        error
+      );
 
-      message(
-        "সমস্যা হয়েছে: " + error.message,
+      setMessage(
+        "সমস্যা হয়েছে: " +
+        error.message,
         "error"
       );
 
@@ -1344,7 +1740,7 @@ document.addEventListener(
 
 
 /* ==========================================
-   INITIALIZATION
+   INITIALIZE
 ========================================== */
 
 createHistoryFilters();
@@ -1354,5 +1750,5 @@ showLogin();
 resetData();
 
 console.log(
-  "Micro Job Admin History System Loaded"
+  "Micro Job Admin Panel - History and Worker Details"
 );
