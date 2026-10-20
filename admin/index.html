@@ -1,4 +1,1438 @@
-<!doctype html>
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  getIdTokenResult
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  writeBatch,
+  runTransaction,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+import {
+  firebaseConfig
+} from "../firebase-config.js";
+
+/* FIREBASE */
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = id => document.getElementById(id);
+
+/* STATE */
+
+let currentAdminUser = null;
+
+let listeners = [];
+let authVersion = 0;
+
+let pendingJobs = [];
+let pendingTasks = [];
+let pendingDeposits = [];
+let pendingWithdrawals = [];
+let allUsers = [];
+
+/* HELPERS */
+
+function escapeHtml(value = "") {
+  return String(value).replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[c])
+  );
+}
+
+function money(value) {
+  const n = Number(value || 0);
+
+  return "৳ " + n.toLocaleString("en-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function dateText(value) {
+  if (!value) return "—";
+
+  const date = value.toDate
+    ? value.toDate()
+    : value.seconds
+      ? new Date(value.seconds * 1000)
+      : null;
+
+  return date
+    ? date.toLocaleString("bn-BD")
+    : "—";
+}
+
+function chip(status) {
+  const safe = escapeHtml(status || "pending");
+
+  return `<span class="chip ${safe}">${safe}</span>`;
+}
+
+function setMessage(text, type = "success") {
+  $("adminMessage").textContent = text;
+
+  $("adminMessage").className =
+    "message " + type;
+}
+
+function clearMessage() {
+  $("adminMessage").className =
+    "message hidden";
+}
+
+function sortDocs(snapshot) {
+  return snapshot.docs
+    .map(d => ({
+      id: d.id,
+      ...d.data()
+    }))
+    .sort((a, b) =>
+      (b.createdAt?.seconds || 0) -
+      (a.createdAt?.seconds || 0)
+    );
+}
+
+/* AUTH VIEWS */
+
+function showLogin() {
+  $("adminAuthBox").classList.remove("hidden");
+  $("adminDeniedBox").classList.add("hidden");
+  $("adminApp").classList.add("hidden");
+
+  $("adminLogoutBtn").classList.add("hidden");
+
+  clearMessage();
+}
+
+function showDenied() {
+  $("adminAuthBox").classList.add("hidden");
+  $("adminDeniedBox").classList.remove("hidden");
+  $("adminApp").classList.add("hidden");
+
+  $("adminLogoutBtn").classList.remove("hidden");
+}
+
+function showAdmin() {
+  $("adminAuthBox").classList.add("hidden");
+  $("adminDeniedBox").classList.add("hidden");
+  $("adminApp").classList.remove("hidden");
+
+  $("adminLogoutBtn").classList.remove("hidden");
+}
+
+/* LOGIN */
+
+$("adminLoginForm").addEventListener(
+  "submit",
+  async e => {
+    e.preventDefault();
+
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        $("adminEmail").value.trim(),
+        $("adminPassword").value
+      );
+
+      $("adminLoginForm").reset();
+
+    } catch (error) {
+      alert(
+        "Admin Login Failed: " + error.message
+      );
+    }
+  }
+);
+
+/* LOGOUT */
+
+$("adminLogoutBtn").addEventListener(
+  "click",
+  async () => {
+    try {
+      await signOut(auth);
+
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+);
+
+/* RENDER STATS */
+
+function renderStats() {
+  const items = [
+    {
+      label: "Pending Jobs",
+      value: pendingJobs.length
+    },
+    {
+      label: "Pending Tasks",
+      value: pendingTasks.length
+    },
+    {
+      label: "Pending Deposits",
+      value: pendingDeposits.length
+    },
+    {
+      label: "Pending Withdrawals",
+      value: pendingWithdrawals.length
+    }
+  ];
+
+  $("adminStats").innerHTML = items.map(item => `
+    <div class="stats-card">
+      <div class="label">${item.label}</div>
+      <div class="value">${item.value}</div>
+    </div>
+  `).join("");
+}
+
+/* ACTION BUTTONS */
+
+function actionButtons(name, id) {
+  const approveStatus =
+    name === "jobs" ? "active" : "approved";
+
+  return `
+    <div style="
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    ">
+
+      <button
+        class="btn primary"
+        type="button"
+        data-collection="${name}"
+        data-id="${escapeHtml(id)}"
+        data-status="${approveStatus}">
+        Approve
+      </button>
+
+      <button
+        class="btn secondary"
+        type="button"
+        data-collection="${name}"
+        data-id="${escapeHtml(id)}"
+        data-status="rejected">
+        Reject
+      </button>
+
+    </div>
+  `;
+}
+
+/* RENDER JOBS */
+
+function renderJobs() {
+  $("pendingJobsList").innerHTML =
+    pendingJobs.length
+      ? pendingJobs.map(job => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(job.title)}</h4>
+            ${chip(job.status)}
+          </div>
+
+          <p>${escapeHtml(job.description || "")}</p>
+
+          <div class="meta">
+            <span>Reward: ${money(job.reward)}</span>
+            <span>
+              Creator:
+              ${escapeHtml(job.creatorName || "")}
+            </span>
+          </div>
+
+          ${actionButtons("jobs", job.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending jobs.</div>`;
+}
+
+/* RENDER TASKS */
+
+function renderTasks() {
+  $("pendingTasksList").innerHTML =
+    pendingTasks.length
+      ? pendingTasks.map(task => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(task.jobTitle)}</h4>
+            ${chip(task.status)}
+          </div>
+
+          <p>
+            Worker:
+            ${escapeHtml(task.submittedByName || "")}
+          </p>
+
+          <p>
+            Proof:
+            ${escapeHtml(task.proof || "")}
+          </p>
+
+          ${actionButtons("tasks", task.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending tasks.</div>`;
+}
+
+/* RENDER DEPOSITS */
+
+function renderDeposits() {
+  $("pendingDepositsList").innerHTML =
+    pendingDeposits.length
+      ? pendingDeposits.map(item => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(item.method)} Deposit</h4>
+            ${chip(item.status)}
+          </div>
+
+          <p>
+            User:
+            ${escapeHtml(item.name || item.email || "")}
+          </p>
+
+          <p>
+            Amount:
+            ${money(item.amount)}
+          </p>
+
+          <p>
+            Test Transaction ID:
+            ${escapeHtml(item.transactionId || "")}
+          </p>
+
+          <p>
+            UID:
+            ${escapeHtml(item.uid || "")}
+          </p>
+
+          ${actionButtons("deposits", item.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending deposits.</div>`;
+}
+
+/* RENDER WITHDRAWALS */
+
+function renderWithdrawals() {
+  $("pendingWithdrawalsList").innerHTML =
+    pendingWithdrawals.length
+      ? pendingWithdrawals.map(item => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(item.method)} Withdrawal</h4>
+            ${chip(item.status)}
+          </div>
+
+          <p>
+            User:
+            ${escapeHtml(item.name || item.email || "")}
+          </p>
+
+          <p>
+            Amount:
+            ${money(item.amount)}
+          </p>
+
+          <p>
+            Account:
+            ${escapeHtml(item.accountNumber || "")}
+          </p>
+
+          <p class="muted">
+            Testing Mode — No real payout.
+          </p>
+
+          ${actionButtons("withdrawals", item.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending withdrawals.</div>`;
+}
+
+/* RENDER USERS */
+
+function renderUsers() {
+  $("usersList").innerHTML =
+    allUsers.length
+      ? allUsers.map(user => `
+        <article class="item-card">
+
+          <h4>${escapeHtml(user.name || "User")}</h4>
+
+          <div class="meta">
+            <span>
+              Email:
+              ${escapeHtml(user.email || "")}
+            </span>
+
+            <span>
+              UID:
+              ${escapeHtml(user.uid || user.id)}
+            </span>
+          </div>
+
+          <p>
+            Main Balance:
+            ${money(user.mainBalance || 0)}
+          </p>
+
+          <p>
+            Deposit Balance:
+            ${money(user.depositBalance || 0)}
+          </p>
+
+        </article>
+      `).join("")
+      : `<div class="empty">No users found.</div>`;
+}
+
+/* RENDER ALL */
+
+function renderAll() {
+  renderStats();
+  renderJobs();
+  renderTasks();
+  renderDeposits();
+  renderWithdrawals();
+  renderUsers();
+}
+
+/* APPROVAL */
+
+async function updateStatus(
+  collectionName,
+  id,
+  status
+) {
+  if (!currentAdminUser) {
+    throw new Error("Admin login required.");
+  }
+
+  const allowed = [
+    "jobs",
+    "tasks",
+    "deposits",
+    "withdrawals"
+  ];
+
+  if (!allowed.includes(collectionName)) {
+    throw new Error("Invalid collection.");
+  }
+
+  if (
+    collectionName === "jobs"
+      ? !["active", "rejected"].includes(status)
+      : !["approved", "rejected"].includes(status)
+  ) {
+    throw new Error("Invalid status.");
+  }
+
+  const itemRef = doc(db, collectionName, id);
+
+  // Deposit activation is atomic: both writes succeed
+  // together or neither succeeds.
+  if (
+    collectionName === "deposits" &&
+    status === "approved"
+  ) {
+    await runTransaction(db, async transaction => {
+      const itemSnap = await transaction.get(itemRef);
+
+      if (!itemSnap.exists()) {
+        throw new Error("Deposit not found.");
+      }
+
+      const item = itemSnap.data();
+
+      if (item.status !== "pending") {
+        throw new Error("Deposit already processed.");
+      }
+
+      if (
+        typeof item.uid !== "string" ||
+        Number(item.amount) < 300
+      ) {
+        throw new Error("Invalid deposit.");
+      }
+
+      const accessRef = doc(
+        db,
+        "userAccess",
+        item.uid
+      );
+
+      const accessSnap = await transaction.get(accessRef);
+
+      const alreadyActive =
+        accessSnap.exists() &&
+        accessSnap.data().workEnabled === true;
+
+      transaction.update(itemRef, {
+        status: "approved"
+      });
+
+      // Lifetime activation is created only once.
+      if (!alreadyActive) {
+        transaction.set(accessRef, {
+          workEnabled: true,
+          verifiedDepositId: id,
+          activatedAt: serverTimestamp()
+        });
+      }
+    });
+
+  } else {
+    await runTransaction(db, async transaction => {
+      const snap = await transaction.get(itemRef);
+
+      if (!snap.exists()) {
+        throw new Error("Request not found.");
+      }
+
+      if (snap.data().status !== "pending") {
+        throw new Error("Request already processed.");
+      }
+
+      transaction.update(itemRef, {
+        status
+      });
+    });
+  }
+
+  setMessage(
+    `${collectionName}: ${status} (Testing Mode)`,
+    "success"
+  );
+}
+
+/* ADMIN BUTTON EVENTS */
+
+document.addEventListener("click", async event => {
+  const button = event.target.closest(
+    "button[data-collection][data-id][data-status]"
+  );
+
+  if (!button) return;
+
+  const collectionName = button.dataset.collection;
+  const id = button.dataset.id;
+  const status = button.dataset.status;
+
+  const confirmText =
+    collectionName === "deposits" &&
+    status === "approved"
+      ? "এই Test Deposit Approve করলে ইউজারের Lifetime Work Access চালু হবে। কোনো Wallet Balance যোগ হবে না। চালিয়ে যাবেন?"
+      : `${collectionName} ${status} করবেন? এটি শুধু Testing Mode-এর Status পরিবর্তন করবে।`;
+
+  if (!confirm(confirmText)) return;
+
+  button.disabled = true;
+
+  try {
+    await updateStatus(
+      collectionName,
+      id,
+      status
+    );
+
+  } catch (error) {
+    setMessage(error.message, "error");
+
+  } finally {
+    button.disabled = false;
+  }
+});
+
+/* LISTENERS */
+
+function stopListeners() {
+  listeners.forEach(unsubscribe => {
+    try {
+      unsubscribe();
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  listeners = [];
+}
+
+function listen(name, field, value, callback) {
+  const q = query(
+    collection(db, name),
+    where(field, "==", value)
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    snapshot => {
+      callback(sortDocs(snapshot));
+      renderAll();
+    },
+    error => {
+      setMessage(
+        name + ": " + error.message,
+        "error"
+      );
+    }
+  );
+
+  listeners.push(unsubscribe);
+}
+
+function startListeners() {
+  listen(
+    "jobs",
+    "status",
+    "pending",
+    data => {
+      pendingJobs = data;
+    }
+  );
+
+  listen(
+    "tasks",
+    "status",
+    "pending",
+    data => {
+      pendingTasks = data;
+    }
+  );
+
+  listen(
+    "deposits",
+    "status",
+    "pending",
+    data => {
+      pendingDeposits = data;
+    }
+  );
+
+  listen(
+    "withdrawals",
+    "status",
+    "pending",
+    data => {
+      pendingWithdrawals = data;
+    }
+  );
+
+  const unsubscribe = onSnapshot(
+    collection(db, "users"),
+    snapshot => {
+      allUsers = sortDocs(snapshot);
+      renderAll();
+    },
+    error => {
+      setMessage(error.message, "error");
+    }
+  );
+
+  listeners.push(unsubscribe);
+}
+
+/* AUTH STATE */
+
+onAuthStateChanged(auth, async user => {
+  const version = ++authVersion;
+
+  stopListeners();
+
+  currentAdminUser = null;
+
+  pendingJobs = [];
+  pendingTasks = [];
+  pendingDeposits = [];
+  pendingWithdrawals = [];
+  allUsers = [];
+
+  renderAll();
+
+  if (!user) {
+    showLogin();
+    return;
+  }
+
+  try {
+    const token = await getIdTokenResult(
+      user,
+      true
+    );
+
+    if (version !== authVersion) return;
+
+    if (token.claims.admin !== true) {
+      showDenied();
+      return;
+    }
+
+    currentAdminUser = user;
+
+    showAdmin();
+    startListeners();
+
+  } catch (error) {
+    if (version !== authVersion) return;
+
+    console.error(error);
+    showDenied();
+  }
+}import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  getIdTokenResult
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  writeBatch,
+  runTransaction,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+import {
+  firebaseConfig
+} from "../firebase-config.js";
+
+/* FIREBASE */
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = id => document.getElementById(id);
+
+/* STATE */
+
+let currentAdminUser = null;
+
+let listeners = [];
+let authVersion = 0;
+
+let pendingJobs = [];
+let pendingTasks = [];
+let pendingDeposits = [];
+let pendingWithdrawals = [];
+let allUsers = [];
+
+/* HELPERS */
+
+function escapeHtml(value = "") {
+  return String(value).replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[c])
+  );
+}
+
+function money(value) {
+  const n = Number(value || 0);
+
+  return "৳ " + n.toLocaleString("en-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function dateText(value) {
+  if (!value) return "—";
+
+  const date = value.toDate
+    ? value.toDate()
+    : value.seconds
+      ? new Date(value.seconds * 1000)
+      : null;
+
+  return date
+    ? date.toLocaleString("bn-BD")
+    : "—";
+}
+
+function chip(status) {
+  const safe = escapeHtml(status || "pending");
+
+  return `<span class="chip ${safe}">${safe}</span>`;
+}
+
+function setMessage(text, type = "success") {
+  $("adminMessage").textContent = text;
+
+  $("adminMessage").className =
+    "message " + type;
+}
+
+function clearMessage() {
+  $("adminMessage").className =
+    "message hidden";
+}
+
+function sortDocs(snapshot) {
+  return snapshot.docs
+    .map(d => ({
+      id: d.id,
+      ...d.data()
+    }))
+    .sort((a, b) =>
+      (b.createdAt?.seconds || 0) -
+      (a.createdAt?.seconds || 0)
+    );
+}
+
+/* AUTH VIEWS */
+
+function showLogin() {
+  $("adminAuthBox").classList.remove("hidden");
+  $("adminDeniedBox").classList.add("hidden");
+  $("adminApp").classList.add("hidden");
+
+  $("adminLogoutBtn").classList.add("hidden");
+
+  clearMessage();
+}
+
+function showDenied() {
+  $("adminAuthBox").classList.add("hidden");
+  $("adminDeniedBox").classList.remove("hidden");
+  $("adminApp").classList.add("hidden");
+
+  $("adminLogoutBtn").classList.remove("hidden");
+}
+
+function showAdmin() {
+  $("adminAuthBox").classList.add("hidden");
+  $("adminDeniedBox").classList.add("hidden");
+  $("adminApp").classList.remove("hidden");
+
+  $("adminLogoutBtn").classList.remove("hidden");
+}
+
+/* LOGIN */
+
+$("adminLoginForm").addEventListener(
+  "submit",
+  async e => {
+    e.preventDefault();
+
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        $("adminEmail").value.trim(),
+        $("adminPassword").value
+      );
+
+      $("adminLoginForm").reset();
+
+    } catch (error) {
+      alert(
+        "Admin Login Failed: " + error.message
+      );
+    }
+  }
+);
+
+/* LOGOUT */
+
+$("adminLogoutBtn").addEventListener(
+  "click",
+  async () => {
+    try {
+      await signOut(auth);
+
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+);
+
+/* RENDER STATS */
+
+function renderStats() {
+  const items = [
+    {
+      label: "Pending Jobs",
+      value: pendingJobs.length
+    },
+    {
+      label: "Pending Tasks",
+      value: pendingTasks.length
+    },
+    {
+      label: "Pending Deposits",
+      value: pendingDeposits.length
+    },
+    {
+      label: "Pending Withdrawals",
+      value: pendingWithdrawals.length
+    }
+  ];
+
+  $("adminStats").innerHTML = items.map(item => `
+    <div class="stats-card">
+      <div class="label">${item.label}</div>
+      <div class="value">${item.value}</div>
+    </div>
+  `).join("");
+}
+
+/* ACTION BUTTONS */
+
+function actionButtons(name, id) {
+  const approveStatus =
+    name === "jobs" ? "active" : "approved";
+
+  return `
+    <div style="
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    ">
+
+      <button
+        class="btn primary"
+        type="button"
+        data-collection="${name}"
+        data-id="${escapeHtml(id)}"
+        data-status="${approveStatus}">
+        Approve
+      </button>
+
+      <button
+        class="btn secondary"
+        type="button"
+        data-collection="${name}"
+        data-id="${escapeHtml(id)}"
+        data-status="rejected">
+        Reject
+      </button>
+
+    </div>
+  `;
+}
+
+/* RENDER JOBS */
+
+function renderJobs() {
+  $("pendingJobsList").innerHTML =
+    pendingJobs.length
+      ? pendingJobs.map(job => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(job.title)}</h4>
+            ${chip(job.status)}
+          </div>
+
+          <p>${escapeHtml(job.description || "")}</p>
+
+          <div class="meta">
+            <span>Reward: ${money(job.reward)}</span>
+            <span>
+              Creator:
+              ${escapeHtml(job.creatorName || "")}
+            </span>
+          </div>
+
+          ${actionButtons("jobs", job.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending jobs.</div>`;
+}
+
+/* RENDER TASKS */
+
+function renderTasks() {
+  $("pendingTasksList").innerHTML =
+    pendingTasks.length
+      ? pendingTasks.map(task => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(task.jobTitle)}</h4>
+            ${chip(task.status)}
+          </div>
+
+          <p>
+            Worker:
+            ${escapeHtml(task.submittedByName || "")}
+          </p>
+
+          <p>
+            Proof:
+            ${escapeHtml(task.proof || "")}
+          </p>
+
+          ${actionButtons("tasks", task.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending tasks.</div>`;
+}
+
+/* RENDER DEPOSITS */
+
+function renderDeposits() {
+  $("pendingDepositsList").innerHTML =
+    pendingDeposits.length
+      ? pendingDeposits.map(item => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(item.method)} Deposit</h4>
+            ${chip(item.status)}
+          </div>
+
+          <p>
+            User:
+            ${escapeHtml(item.name || item.email || "")}
+          </p>
+
+          <p>
+            Amount:
+            ${money(item.amount)}
+          </p>
+
+          <p>
+            Test Transaction ID:
+            ${escapeHtml(item.transactionId || "")}
+          </p>
+
+          <p>
+            UID:
+            ${escapeHtml(item.uid || "")}
+          </p>
+
+          ${actionButtons("deposits", item.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending deposits.</div>`;
+}
+
+/* RENDER WITHDRAWALS */
+
+function renderWithdrawals() {
+  $("pendingWithdrawalsList").innerHTML =
+    pendingWithdrawals.length
+      ? pendingWithdrawals.map(item => `
+        <article class="item-card">
+
+          <div class="item-top">
+            <h4>${escapeHtml(item.method)} Withdrawal</h4>
+            ${chip(item.status)}
+          </div>
+
+          <p>
+            User:
+            ${escapeHtml(item.name || item.email || "")}
+          </p>
+
+          <p>
+            Amount:
+            ${money(item.amount)}
+          </p>
+
+          <p>
+            Account:
+            ${escapeHtml(item.accountNumber || "")}
+          </p>
+
+          <p class="muted">
+            Testing Mode — No real payout.
+          </p>
+
+          ${actionButtons("withdrawals", item.id)}
+
+        </article>
+      `).join("")
+      : `<div class="empty">No pending withdrawals.</div>`;
+}
+
+/* RENDER USERS */
+
+function renderUsers() {
+  $("usersList").innerHTML =
+    allUsers.length
+      ? allUsers.map(user => `
+        <article class="item-card">
+
+          <h4>${escapeHtml(user.name || "User")}</h4>
+
+          <div class="meta">
+            <span>
+              Email:
+              ${escapeHtml(user.email || "")}
+            </span>
+
+            <span>
+              UID:
+              ${escapeHtml(user.uid || user.id)}
+            </span>
+          </div>
+
+          <p>
+            Main Balance:
+            ${money(user.mainBalance || 0)}
+          </p>
+
+          <p>
+            Deposit Balance:
+            ${money(user.depositBalance || 0)}
+          </p>
+
+        </article>
+      `).join("")
+      : `<div class="empty">No users found.</div>`;
+}
+
+/* RENDER ALL */
+
+function renderAll() {
+  renderStats();
+  renderJobs();
+  renderTasks();
+  renderDeposits();
+  renderWithdrawals();
+  renderUsers();
+}
+
+/* APPROVAL */
+
+async function updateStatus(
+  collectionName,
+  id,
+  status
+) {
+  if (!currentAdminUser) {
+    throw new Error("Admin login required.");
+  }
+
+  const allowed = [
+    "jobs",
+    "tasks",
+    "deposits",
+    "withdrawals"
+  ];
+
+  if (!allowed.includes(collectionName)) {
+    throw new Error("Invalid collection.");
+  }
+
+  if (
+    collectionName === "jobs"
+      ? !["active", "rejected"].includes(status)
+      : !["approved", "rejected"].includes(status)
+  ) {
+    throw new Error("Invalid status.");
+  }
+
+  const itemRef = doc(db, collectionName, id);
+
+  // Deposit activation is atomic: both writes succeed
+  // together or neither succeeds.
+  if (
+    collectionName === "deposits" &&
+    status === "approved"
+  ) {
+    await runTransaction(db, async transaction => {
+      const itemSnap = await transaction.get(itemRef);
+
+      if (!itemSnap.exists()) {
+        throw new Error("Deposit not found.");
+      }
+
+      const item = itemSnap.data();
+
+      if (item.status !== "pending") {
+        throw new Error("Deposit already processed.");
+      }
+
+      if (
+        typeof item.uid !== "string" ||
+        Number(item.amount) < 300
+      ) {
+        throw new Error("Invalid deposit.");
+      }
+
+      const accessRef = doc(
+        db,
+        "userAccess",
+        item.uid
+      );
+
+      const accessSnap = await transaction.get(accessRef);
+
+      const alreadyActive =
+        accessSnap.exists() &&
+        accessSnap.data().workEnabled === true;
+
+      transaction.update(itemRef, {
+        status: "approved"
+      });
+
+      // Lifetime activation is created only once.
+      if (!alreadyActive) {
+        transaction.set(accessRef, {
+          workEnabled: true,
+          verifiedDepositId: id,
+          activatedAt: serverTimestamp()
+        });
+      }
+    });
+
+  } else {
+    await runTransaction(db, async transaction => {
+      const snap = await transaction.get(itemRef);
+
+      if (!snap.exists()) {
+        throw new Error("Request not found.");
+      }
+
+      if (snap.data().status !== "pending") {
+        throw new Error("Request already processed.");
+      }
+
+      transaction.update(itemRef, {
+        status
+      });
+    });
+  }
+
+  setMessage(
+    `${collectionName}: ${status} (Testing Mode)`,
+    "success"
+  );
+}
+
+/* ADMIN BUTTON EVENTS */
+
+document.addEventListener("click", async event => {
+  const button = event.target.closest(
+    "button[data-collection][data-id][data-status]"
+  );
+
+  if (!button) return;
+
+  const collectionName = button.dataset.collection;
+  const id = button.dataset.id;
+  const status = button.dataset.status;
+
+  const confirmText =
+    collectionName === "deposits" &&
+    status === "approved"
+      ? "এই Test Deposit Approve করলে ইউজারের Lifetime Work Access চালু হবে। কোনো Wallet Balance যোগ হবে না। চালিয়ে যাবেন?"
+      : `${collectionName} ${status} করবেন? এটি শুধু Testing Mode-এর Status পরিবর্তন করবে।`;
+
+  if (!confirm(confirmText)) return;
+
+  button.disabled = true;
+
+  try {
+    await updateStatus(
+      collectionName,
+      id,
+      status
+    );
+
+  } catch (error) {
+    setMessage(error.message, "error");
+
+  } finally {
+    button.disabled = false;
+  }
+});
+
+/* LISTENERS */
+
+function stopListeners() {
+  listeners.forEach(unsubscribe => {
+    try {
+      unsubscribe();
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  listeners = [];
+}
+
+function listen(name, field, value, callback) {
+  const q = query(
+    collection(db, name),
+    where(field, "==", value)
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    snapshot => {
+      callback(sortDocs(snapshot));
+      renderAll();
+    },
+    error => {
+      setMessage(
+        name + ": " + error.message,
+        "error"
+      );
+    }
+  );
+
+  listeners.push(unsubscribe);
+}
+
+function startListeners() {
+  listen(
+    "jobs",
+    "status",
+    "pending",
+    data => {
+      pendingJobs = data;
+    }
+  );
+
+  listen(
+    "tasks",
+    "status",
+    "pending",
+    data => {
+      pendingTasks = data;
+    }
+  );
+
+  listen(
+    "deposits",
+    "status",
+    "pending",
+    data => {
+      pendingDeposits = data;
+    }
+  );
+
+  listen(
+    "withdrawals",
+    "status",
+    "pending",
+    data => {
+      pendingWithdrawals = data;
+    }
+  );
+
+  const unsubscribe = onSnapshot(
+    collection(db, "users"),
+    snapshot => {
+      allUsers = sortDocs(snapshot);
+      renderAll();
+    },
+    error => {
+      setMessage(error.message, "error");
+    }
+  );
+
+  listeners.push(unsubscribe);
+}
+
+/* AUTH STATE */
+
+onAuthStateChanged(auth, async user => {
+  const version = ++authVersion;
+
+  stopListeners();
+
+  currentAdminUser = null;
+
+  pendingJobs = [];
+  pendingTasks = [];
+  pendingDeposits = [];
+  pendingWithdrawals = [];
+  allUsers = [];
+
+  renderAll();
+
+  if (!user) {
+    showLogin();
+    return;
+  }
+
+  try {
+    const token = await getIdTokenResult(
+      user,
+      true
+    );
+
+    if (version !== authVersion) return;
+
+    if (token.claims.admin !== true) {
+      showDenied();
+      return;
+    }
+
+    currentAdminUser = user;
+
+    showAdmin();
+    startListeners();
+
+  } catch (error) {
+    if (version !== authVersion) return;
+
+    console.error(error);
+    showDenied();
+  }
+});<!doctype html>
 <html lang="bn">
 <head>
   <meta charset="UTF-8" />
