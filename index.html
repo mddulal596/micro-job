@@ -1,1233 +1,495 @@
 <!DOCTYPE html>
 <html lang="bn">
-
 <head>
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
+<title>Micro Job</title>
 
-  <title>Micro Job - Earn Online</title>
+<link rel="stylesheet" href="style.css">
 
-  <link rel="stylesheet" href="style.css">
-
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-  >
-
-  <style>
-    /* Current Firebase app.js compatibility */
-
-    .shell {
-      max-width: 1100px;
-      margin: auto;
-      padding: 16px;
-    }
-
-    .topbar {
-      background: white;
-      border-radius: 16px;
-      padding: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 18px;
-      box-shadow: 0 4px 20px #00000008;
-    }
-
-    .topbar h1 {
-      color: #5145e5;
-      font-size: 23px;
-    }
-
-    .topbar p {
-      color: #64748b;
-      font-size: 12px;
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .topbar-actions .badge {
-      margin: 0;
-    }
-
-    .topbar-actions .btn,
-    .topbar-actions .link-btn {
-      width: auto;
-      padding: 10px 13px;
-      border-radius: 10px;
-      font-size: 12px;
-    }
-
-    .link-btn {
-      background: #5145e5;
-      color: white;
-      padding: 10px 14px;
-      border-radius: 10px;
-      text-decoration: none;
-      font-size: 13px;
-    }
-
-    .btn {
-      border: none;
-      padding: 13px 16px;
-      border-radius: 12px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .btn.primary {
-      background: linear-gradient(135deg,#5145e5,#7c3aed);
-      color: white;
-    }
-
-    .btn.success {
-      background: #16a34a;
-      color: white;
-    }
-
-    .btn.secondary {
-      background: #eef2ff;
-      color: #5145e5;
-    }
-
-    .auth-grid,
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2,minmax(0,1fr));
-      gap: 16px;
-    }
-
-    .form {
-      display: grid;
-      gap: 14px;
-      margin-top: 15px;
-    }
-
-    .field {
-      display: grid;
-      gap: 7px;
-    }
-
-    .field label {
-      margin: 0;
-    }
-
-    .field input,
-    .field textarea,
-    .field select {
-      width: 100%;
-      padding: 13px;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      background: white;
-      color: #1e293b;
-      outline: none;
-    }
-
-    .field input:focus,
-    .field textarea:focus,
-    .field select:focus {
-      border-color: #5145e5;
-      box-shadow: 0 0 0 3px #5145e51a;
-    }
-
-    .tabs {
-      display: none;
-    }
-
-    .panel {
-      display: none;
-    }
-
-    .panel.active {
-      display: block;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3,minmax(0,1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .stats-card {
-      background: white;
-      padding: 20px;
-      border-radius: 16px;
-      text-align: center;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 4px 15px #00000005;
-    }
-
-    .stats-card .label {
-      color: #64748b;
-      font-size: 13px;
-    }
-
-    .stats-card .value {
-      font-size: 24px;
-      color: #5145e5;
-      font-weight: bold;
-      margin-top: 8px;
-    }
-
-    .list {
-      display: grid;
-      gap: 12px;
-      margin-top: 15px;
-    }
-
-    .item-card {
-      background: #f8faff;
-      padding: 15px;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      overflow-wrap: anywhere;
-    }
-
-    .item-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    .item-top h4 {
-      font-size: 16px;
-    }
-
-    .item-body p,
-    .item-card p {
-      color: #64748b;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    .meta {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-      color: #64748b;
-      font-size: 12px;
-    }
-
-    .chip {
-      padding: 6px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: bold;
-      white-space: nowrap;
-    }
-
-    .chip.pending {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .chip.active,
-    .chip.approved {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    .chip.rejected {
-      background: #fee2e2;
-      color: #dc2626;
-    }
-
-    .message {
-      padding: 14px;
-      border-radius: 12px;
-      margin-bottom: 15px;
-      background: #eef2ff;
-      color: #3730a3;
-    }
-
-    .message.success {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    .message.error {
-      background: #fee2e2;
-      color: #dc2626;
-    }
-
-    .empty {
-      padding: 20px;
-      text-align: center;
-      color: #64748b;
-      background: #f8faff;
-      border-radius: 12px;
-    }
-
-    .note-box {
-      background: #eef2ff;
-      color: #3730a3;
-      padding: 15px;
-      border-radius: 12px;
-      line-height: 1.8;
-      margin-top: 12px;
-    }
-
-    .profile-info {
-      margin: 15px 0;
-      line-height: 2;
-    }
-
-    .mt {
-      margin-top: 18px;
-    }
-
-    .app-bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      display: flex;
-      justify-content: space-around;
-      padding: 10px 4px;
-      padding-bottom: max(10px, env(safe-area-inset-bottom));
-      box-shadow: 0 -4px 20px #00000012;
-      z-index: 200;
-      border-top: 1px solid #e2e8f0;
-    }
-
-    .app-bottom-nav .tab {
-      flex: 1;
-      border: none;
-      background: transparent;
-      color: #64748b;
-      font-size: 12px;
-      padding: 8px 4px;
-      cursor: pointer;
-    }
-
-    .app-bottom-nav .tab i {
-      display: block;
-      font-size: 21px;
-      margin-bottom: 6px;
-    }
-
-    .app-bottom-nav .tab.active {
-      color: #5145e5;
-      font-weight: bold;
-    }
-
-    #appView {
-      padding-bottom: 105px;
-    }
-
-    @media(max-width:768px) {
-      .auth-grid,
-      .grid-2 {
-        grid-template-columns: 1fr;
-      }
-
-      .stats-grid {
-        grid-template-columns: repeat(2,minmax(0,1fr));
-      }
-
-      .topbar {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .topbar-actions {
-        width: 100%;
-      }
-    }
-
-    @media(max-width:480px) {
-      .shell {
-        padding: 10px;
-      }
-
-      .stats-card {
-        padding: 15px 8px;
-      }
-
-      .stats-card .value {
-        font-size: 20px;
-      }
-
-      .item-top {
-        flex-direction: column;
-      }
-    }
-  </style>
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 </head>
-
 <body>
 
-<main class="shell">
+<!-- LOGIN / REGISTER -->
 
-  <!-- HEADER -->
+<section id="authView" class="auth-container">
 
-  <header class="topbar">
+<div class="auth-card">
 
-    <div>
-      <h1>
-        <i class="fa-solid fa-briefcase"></i>
-        Micro Job
-      </h1>
-      <p>Work • Earn • Grow</p>
-    </div>
-
-    <div class="topbar-actions">
-
-      <span
-        id="userBadge"
-        class="badge hidden">
-      </span>
-
-      <a
-        id="adminLink"
-        class="link-btn hidden"
-        href="./admin/">
-        <i class="fa-solid fa-user-shield"></i>
-        Admin
-      </a>
-
-      <button
-        id="logoutBtn"
-        class="btn secondary hidden"
-        type="button">
-        <i class="fa-solid fa-right-from-bracket"></i>
-        Logout
-      </button>
-
-    </div>
+<div class="logo">
+<i class="fa-solid fa-briefcase"></i>
+<h1>Micro Job</h1>
+<p>Work • Earn • Grow</p>
+</div>
 
-  </header>
+<div id="loginBox">
 
+<h2>Welcome Back</h2>
+<p class="subtitle">Login to your account</p>
 
-  <!-- LOGIN / REGISTER -->
+<form id="loginForm">
 
-  <section id="authView" class="auth-grid">
+<div class="input-group">
+<i class="fa-solid fa-envelope"></i>
+<input id="loginEmail" type="email" placeholder="Email Address" required>
+</div>
 
-    <div class="card">
+<div class="input-group">
+<i class="fa-solid fa-lock"></i>
+<input id="loginPassword" type="password" placeholder="Password" required>
+</div>
 
-      <h2>
-        <i class="fa-solid fa-right-to-bracket"></i>
-        Login
-      </h2>
+<button class="btn-primary" type="submit">Login</button>
 
-      <p class="muted">
-        আপনার অ্যাকাউন্টে লগইন করুন।
-      </p>
+</form>
 
-      <form id="loginForm" class="form">
+<p class="switch">
+Don't have an account?
+<a href="#" id="showRegister">Register</a>
+</p>
 
-        <div class="field">
-          <label for="loginEmail">Email</label>
-          <input
-            id="loginEmail"
-            type="email"
-            placeholder="Enter email"
-            required>
-        </div>
+</div>
 
-        <div class="field">
-          <label for="loginPassword">Password</label>
-          <input
-            id="loginPassword"
-            type="password"
-            placeholder="Enter password"
-            required>
-        </div>
+<div id="registerBox" class="hidden">
 
-        <button class="btn-primary" type="submit">
-          Login
-        </button>
+<h2>Create Account</h2>
+<p class="subtitle">Join Micro Job today</p>
 
-      </form>
+<form id="registerForm">
 
-    </div>
+<div class="input-group">
+<i class="fa-solid fa-user"></i>
+<input id="regName" type="text" placeholder="Full Name" required>
+</div>
 
+<div class="input-group">
+<i class="fa-solid fa-envelope"></i>
+<input id="regEmail" type="email" placeholder="Email Address" required>
+</div>
 
-    <div class="card">
+<div class="input-group">
+<i class="fa-solid fa-lock"></i>
+<input id="regPassword" type="password" minlength="6" placeholder="Password" required>
+</div>
 
-      <h2>
-        <i class="fa-solid fa-user-plus"></i>
-        Register
-      </h2>
+<button class="btn-primary" type="submit">Create Account</button>
 
-      <p class="muted">
-        নতুন অ্যাকাউন্ট তৈরি করুন।
-      </p>
+</form>
 
-      <form id="registerForm" class="form">
+<p class="switch">
+Already have an account?
+<a href="#" id="showLogin">Login</a>
+</p>
 
-        <div class="field">
-          <label for="regName">Full Name</label>
-          <input
-            id="regName"
-            type="text"
-            placeholder="Your name"
-            required>
-        </div>
+</div>
 
-        <div class="field">
-          <label for="regEmail">Email</label>
-          <input
-            id="regEmail"
-            type="email"
-            placeholder="Enter email"
-            required>
-        </div>
+<div id="authMessage" class="message hidden"></div>
 
-        <div class="field">
-          <label for="regPassword">Password</label>
-          <input
-            id="regPassword"
-            type="password"
-            minlength="6"
-            placeholder="Minimum 6 characters"
-            required>
-        </div>
+</div>
+</section>
 
-        <button class="btn-primary" type="submit">
-          Create Account
-        </button>
 
-      </form>
+<!-- MAIN APP -->
 
-    </div>
+<section id="appView" class="hidden">
 
-  </section>
+<header class="header">
 
+<div class="brand">
+<i class="fa-solid fa-briefcase"></i>
+Micro Job
+</div>
 
-  <!-- MAIN APPLICATION -->
+<div class="header-right">
 
-  <section id="appView" class="hidden">
+<span id="headerBalance" class="header-balance">৳ 0.00</span>
 
-    <!-- NAVIGATION -->
+<a id="adminLink" class="admin-link hidden" href="./admin/">
+<i class="fa-solid fa-user-shield"></i>
+</a>
 
-    <nav class="tabs">
+<button id="logoutBtn" class="logout-btn" type="button">
+<i class="fa-solid fa-right-from-bracket"></i>
+</button>
 
-      <button
-        class="tab active"
-        data-panel="dashboard"
-        type="button">
-        Dashboard
-      </button>
+</div>
+</header>
 
-      <button
-        class="tab"
-        data-panel="jobs"
-        type="button">
-        Jobs
-      </button>
 
-      <button
-        class="tab"
-        data-panel="tasks"
-        type="button">
-        Tasks
-      </button>
+<main class="dashboard-container">
 
-      <button
-        class="tab"
-        data-panel="wallet"
-        type="button">
-        Wallet
-      </button>
+<div id="messageBox" class="message hidden"></div>
 
-    </nav>
 
+<!-- HOME -->
 
-    <div
-      id="messageBox"
-      class="message hidden">
-    </div>
+<section id="dashboardPanel" class="page panel active">
 
+<h2 id="welcomeText">Welcome 👋</h2>
 
-    <!-- DASHBOARD -->
+<div class="balance-card">
 
-    <section
-      id="dashboardPanel"
-      class="panel active">
+<p>Available Balance</p>
 
-      <h2 class="section-title">
-        <i class="fa-solid fa-chart-line"></i>
-        Dashboard Overview
-      </h2>
+<h1 id="balanceAmount">৳ 0.00</h1>
 
-      <div
-        id="dashboardStats"
-        class="stats-grid">
-      </div>
+<div class="balance-actions">
 
+<button type="button" data-go="deposit">
+<i class="fa-solid fa-arrow-down"></i>
+Deposit
+</button>
 
-      <div class="grid-2">
+<button type="button" data-go="withdraw">
+<i class="fa-solid fa-arrow-up"></i>
+Withdraw
+</button>
 
-        <!-- PROFILE -->
+</div>
 
-        <div class="card profile-card">
+</div>
 
-          <div class="profile-avatar">
-            <i class="fa-solid fa-user"></i>
-          </div>
 
-          <h3>My Profile</h3>
+<div class="stats">
 
-          <p>
-            Manage your account information
-          </p>
+<div class="stat-box">
+<i class="fa-solid fa-circle-check"></i>
+<h3 id="completedJobsCount">0</h3>
+<p>Completed Jobs</p>
+</div>
 
-          <div class="profile-info">
+<div class="stat-box">
+<i class="fa-solid fa-clock"></i>
+<h3 id="pendingJobsCount">0</h3>
+<p>Pending Jobs</p>
+</div>
 
-            <p>
-              <strong>Email:</strong>
-              <span id="profileEmail">-</span>
-            </p>
+<div class="stat-box">
+<i class="fa-solid fa-users"></i>
+<h3 id="referralsCount">0</h3>
+<p>Referrals</p>
+</div>
 
-            <p>
-              <strong>Wallet Balance:</strong>
-              <span id="profileBalance">৳0</span>
-            </p>
+</div>
 
-          </div>
 
-          <form id="profileForm" class="form">
+<div class="quick-actions">
 
-            <div class="field">
+<button type="button" data-go="jobs">
+<i class="fa-solid fa-briefcase"></i>
+Find Jobs
+</button>
 
-              <label for="profileName">
-                Display Name
-              </label>
+<button type="button" data-go="post">
+<i class="fa-solid fa-circle-plus"></i>
+Post Job
+</button>
 
-              <input
-                id="profileName"
-                type="text"
-                placeholder="Your name">
+<button type="button" data-go="tasks">
+<i class="fa-solid fa-list-check"></i>
+My Tasks
+</button>
 
-            </div>
+<button type="button" data-go="wallet">
+<i class="fa-solid fa-wallet"></i>
+My Wallet
+</button>
 
-            <button class="btn-primary" type="submit">
-              Update Profile
-            </button>
+</div>
 
-          </form>
 
-        </div>
+<h3 class="section-title">Available Jobs</h3>
 
+<div id="homeJobsList"></div>
 
-        <!-- QUICK INFORMATION -->
+</section>
 
-        <div class="card">
 
-          <h3>
-            <i class="fa-solid fa-circle-info"></i>
-            How Micro Job Works
-          </h3>
+<!-- JOBS -->
 
-          <div class="note-box">
+<section id="jobsPanel" class="page panel">
 
-            <p>
-              <i class="fa-solid fa-check-circle"></i>
-              Available jobs দেখুন।
-            </p>
+<h2>Available Jobs</h2>
 
-            <p>
-              <i class="fa-solid fa-check-circle"></i>
-              Job সম্পন্ন করে proof জমা দিন।
-            </p>
+<div id="activeJobsList" class="jobs-list"></div>
 
-            <p>
-              <i class="fa-solid fa-check-circle"></i>
-              Admin আপনার task যাচাই করবে।
-            </p>
+</section>
 
-            <p>
-              <i class="fa-solid fa-check-circle"></i>
-              Wallet থেকে deposit ও withdraw request করতে পারবেন।
-            </p>
 
-          </div>
+<!-- POST JOB -->
 
-          <p class="muted">
-            Note: Deposit, withdrawal এবং task approval
-            এখন শুধু status পরিবর্তন করে।
-            Wallet balance স্বয়ংক্রিয়ভাবে পরিবর্তন হয় না।
-          </p>
+<section id="postPanel" class="page panel">
 
-        </div>
+<h2>Post New Job</h2>
 
-      </div>
+<div class="card">
 
-    </section>
+<form id="jobForm">
 
+<label for="jobTitle">Job Title</label>
+<input id="jobTitle" class="form-control" required>
 
-    <!-- JOBS -->
+<label for="jobDescription">Job Description</label>
+<textarea id="jobDescription" class="form-control" required></textarea>
 
-    <section
-      id="jobsPanel"
-      class="panel">
+<label for="jobReward">Reward Amount (৳)</label>
+<input id="jobReward" type="number" min="1" step="0.01" class="form-control" required>
 
-      <h2 class="section-title">
-        <i class="fa-solid fa-briefcase"></i>
-        Micro Jobs
-      </h2>
+<button class="btn-primary" type="submit">Submit Job</button>
 
+</form>
 
-      <div class="grid-2">
+</div>
 
-        <div class="card">
+<h3 class="section-title">My Posted Jobs</h3>
 
-          <h3>Post New Job</h3>
+<div id="myJobsList"></div>
 
-          <p class="muted">
-            নতুন job তৈরি করুন।
-          </p>
+</section>
 
-          <form id="jobForm" class="form">
 
-            <div class="field">
+<!-- TASKS -->
 
-              <label for="jobTitle">
-                Job Title
-              </label>
+<section id="tasksPanel" class="page panel">
 
-              <input
-                id="jobTitle"
-                type="text"
-                placeholder="Example: Facebook Page Like"
-                required>
+<h2>My Tasks</h2>
 
-            </div>
+<div class="card">
 
+<h3>Submit Task</h3>
 
-            <div class="field">
+<form id="taskForm">
 
-              <label for="jobDescription">
-                Job Description
-              </label>
+<label for="taskJobSelect">Select Job</label>
 
-              <textarea
-                id="jobDescription"
-                rows="5"
-                placeholder="Write complete job details"
-                required></textarea>
+<select id="taskJobSelect" class="form-control" required>
+<option value="">Select Job</option>
+</select>
 
-            </div>
+<label for="taskProof">Task Proof</label>
 
+<textarea id="taskProof" class="form-control" placeholder="Proof link or details" required></textarea>
 
-            <div class="field">
+<button class="btn-primary" type="submit">Submit Task</button>
 
-              <label for="jobReward">
-                Reward Amount (৳)
-              </label>
+</form>
 
-              <input
-                id="jobReward"
-                type="number"
-                min="1"
-                step="0.01"
-                placeholder="Example: 20"
-                required>
+</div>
 
-            </div>
+<h3 class="section-title">Submitted Tasks</h3>
 
+<div id="myTasksList"></div>
 
-            <button
-              class="btn-primary"
-              type="submit">
+</section>
 
-              <i class="fa-solid fa-paper-plane"></i>
-              Submit Job
 
-            </button>
+<!-- WALLET -->
 
-          </form>
+<section id="walletPanel" class="page panel">
 
-        </div>
+<h2>My Wallet</h2>
 
+<div class="balance-card">
 
-        <div class="card">
+<p>Available Balance</p>
 
-          <h3>
-            <i class="fa-solid fa-list-check"></i>
-            Available Jobs
-          </h3>
+<h1 id="walletBalance">৳ 0.00</h1>
 
-          <p class="muted">
-            Admin approved jobs এখানে দেখাবে।
-          </p>
+<div class="balance-actions">
 
-          <div
-            id="activeJobsList"
-            class="list">
-          </div>
+<button type="button" data-go="deposit">Deposit</button>
 
-        </div>
+<button type="button" data-go="withdraw">Withdraw</button>
 
-      </div>
+</div>
 
+</div>
 
-      <div class="card mt">
 
-        <h3>
-          <i class="fa-solid fa-clock-rotate-left"></i>
-          My Posted Jobs
-        </h3>
+<div class="wallet-grid">
 
-        <div
-          id="myJobsList"
-          class="list">
-        </div>
+<button type="button" data-go="deposit">
+<i class="fa-solid fa-arrow-down"></i>
+Deposit Money
+</button>
 
-      </div>
+<button type="button" data-go="withdraw">
+<i class="fa-solid fa-arrow-up"></i>
+Withdraw Money
+</button>
 
-    </section>
+</div>
 
+<h3 class="section-title">Deposit History</h3>
+<div id="depositHistoryList"></div>
 
-    <!-- TASKS -->
+<h3 class="section-title">Withdrawal History</h3>
+<div id="withdrawHistoryList"></div>
 
-    <section
-      id="tasksPanel"
-      class="panel">
+</section>
 
-      <h2 class="section-title">
-        <i class="fa-solid fa-list-check"></i>
-        My Tasks
-      </h2>
 
-      <div class="grid-2">
+<!-- DEPOSIT -->
 
-        <div class="card">
+<section id="depositPanel" class="page panel">
 
-          <h3>Submit Task Proof</h3>
+<h2>Deposit Money</h2>
 
-          <p class="muted">
-            কাজ সম্পন্ন করার প্রমাণ জমা দিন।
-          </p>
+<div class="card">
 
-          <form id="taskForm" class="form">
+<div class="info-box">
 
-            <div class="field">
+<strong>Payment Numbers</strong>
 
-              <label for="taskJobSelect">
-                Select Job
-              </label>
+<p>bKash: 01913932587</p>
+<p>Nagad: 01913932587</p>
+<p>Rocket: 01917044596-9</p>
 
-              <select
-                id="taskJobSelect"
-                required>
+</div>
 
-                <option value="">
-                  Loading jobs...
-                </option>
+<form id="depositForm">
 
-              </select>
+<label for="depositMethod">Payment Method</label>
 
-            </div>
+<select id="depositMethod" class="form-control">
+<option value="bKash">bKash</option>
+<option value="Nagad">Nagad</option>
+<option value="Rocket">Rocket</option>
+</select>
 
+<label for="depositAmount">Amount (৳)</label>
+<input id="depositAmount" type="number" min="1" step="0.01" class="form-control" required>
 
-            <div class="field">
+<label for="depositTxn">Transaction ID</label>
+<input id="depositTxn" class="form-control" required>
 
-              <label for="taskProof">
-                Task Proof
-              </label>
+<label for="depositNote">Note</label>
+<textarea id="depositNote" class="form-control"></textarea>
 
-              <textarea
-                id="taskProof"
-                rows="5"
-                placeholder="Enter proof link or details"
-                required></textarea>
+<button class="btn-primary" type="submit">Send Deposit Request</button>
 
-            </div>
+</form>
 
+</div>
 
-            <button
-              class="btn-primary"
-              type="submit">
+</section>
 
-              <i class="fa-solid fa-upload"></i>
-              Submit Task
 
-            </button>
+<!-- WITHDRAW -->
 
-          </form>
+<section id="withdrawPanel" class="page panel">
 
-        </div>
+<h2>Withdraw Money</h2>
 
+<div class="card">
 
-        <div class="card">
+<form id="withdrawForm">
 
-          <h3>
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            Submitted Tasks
-          </h3>
+<label for="withdrawMethod">Payment Method</label>
 
-          <div
-            id="myTasksList"
-            class="list">
-          </div>
+<select id="withdrawMethod" class="form-control">
+<option value="bKash">bKash</option>
+<option value="Nagad">Nagad</option>
+<option value="Rocket">Rocket</option>
+</select>
 
-        </div>
+<label for="withdrawAmount">Amount (৳)</label>
+<input id="withdrawAmount" type="number" min="1" step="0.01" class="form-control" required>
 
-      </div>
+<label for="withdrawAccount">Account Number</label>
+<input id="withdrawAccount" class="form-control" required>
 
-    </section>
+<label for="withdrawNote">Note</label>
+<textarea id="withdrawNote" class="form-control"></textarea>
 
+<button class="btn-primary" type="submit">Send Withdraw Request</button>
 
-    <!-- WALLET -->
+</form>
 
-    <section
-      id="walletPanel"
-      class="panel">
+</div>
 
-      <h2 class="section-title">
-        <i class="fa-solid fa-wallet"></i>
-        My Wallet
-      </h2>
+</section>
 
 
-      <!-- PAYMENT NUMBERS -->
+<!-- PROFILE -->
 
-      <div class="card">
+<section id="profilePanel" class="page panel">
 
-        <h3>
-          <i class="fa-solid fa-money-bill-transfer"></i>
-          Deposit Payment Numbers
-        </h3>
+<h2>My Profile</h2>
 
-        <p class="muted">
-          Deposit করার জন্য নিচের নম্বর ব্যবহার করুন।
-        </p>
+<div class="card profile-card">
 
-        <div class="note-box">
+<div class="profile-avatar">
+<i class="fa-solid fa-user"></i>
+</div>
 
-          <p>
-            <strong>bKash:</strong>
-            01913932587
-          </p>
+<h3 id="profileDisplayName">User</h3>
 
-          <p>
-            <strong>Nagad:</strong>
-            01913932587
-          </p>
+<p id="profileEmail">-</p>
 
-          <p>
-            <strong>Rocket:</strong>
-            01917044596-9
-          </p>
+<p>Balance: <strong id="profileBalance">৳ 0.00</strong></p>
 
-        </div>
+</div>
 
-        <p class="muted">
-          টাকা পাঠানোর আগে নম্বর যাচাই করুন।
-          Transaction ID সংরক্ষণ করুন।
-        </p>
+<div class="card">
 
-      </div>
+<h3>Edit Profile</h3>
 
+<form id="profileForm">
 
-      <div class="grid-2">
+<label for="profileName">Full Name</label>
 
-        <!-- DEPOSIT -->
+<input id="profileName" class="form-control">
 
-        <div class="card">
+<button class="btn-primary" type="submit">
+Update Profile
+</button>
 
-          <h3>
-            <i class="fa-solid fa-circle-arrow-down"></i>
-            Deposit Money
-          </h3>
+</form>
 
-          <form id="depositForm" class="form">
+</div>
 
-            <div class="field">
-
-              <label for="depositMethod">
-                Payment Method
-              </label>
-
-              <select
-                id="depositMethod"
-                required>
-
-                <option value="bKash">
-                  bKash
-                </option>
-
-                <option value="Nagad">
-                  Nagad
-                </option>
-
-                <option value="Rocket">
-                  Rocket
-                </option>
-
-              </select>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="depositAmount">
-                Deposit Amount (৳)
-              </label>
-
-              <input
-                id="depositAmount"
-                type="number"
-                min="1"
-                step="0.01"
-                placeholder="Enter amount"
-                required>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="depositTxn">
-                Transaction ID
-              </label>
-
-              <input
-                id="depositTxn"
-                type="text"
-                placeholder="Enter transaction ID"
-                required>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="depositNote">
-                Note (Optional)
-              </label>
-
-              <textarea
-                id="depositNote"
-                rows="3"
-                placeholder="Additional information"></textarea>
-
-            </div>
-
-
-            <button
-              class="btn-primary"
-              type="submit">
-
-              Send Deposit Request
-
-            </button>
-
-          </form>
-
-        </div>
-
-
-        <!-- WITHDRAW -->
-
-        <div class="card">
-
-          <h3>
-            <i class="fa-solid fa-circle-arrow-up"></i>
-            Withdraw Money
-          </h3>
-
-          <form id="withdrawForm" class="form">
-
-            <div class="field">
-
-              <label for="withdrawMethod">
-                Payment Method
-              </label>
-
-              <select
-                id="withdrawMethod"
-                required>
-
-                <option value="bKash">
-                  bKash
-                </option>
-
-                <option value="Nagad">
-                  Nagad
-                </option>
-
-                <option value="Rocket">
-                  Rocket
-                </option>
-
-              </select>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="withdrawAmount">
-                Withdraw Amount (৳)
-              </label>
-
-              <input
-                id="withdrawAmount"
-                type="number"
-                min="1"
-                step="0.01"
-                placeholder="Enter amount"
-                required>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="withdrawAccount">
-                Account Number
-              </label>
-
-              <input
-                id="withdrawAccount"
-                type="tel"
-                placeholder="Your payment number"
-                required>
-
-            </div>
-
-
-            <div class="field">
-
-              <label for="withdrawNote">
-                Note (Optional)
-              </label>
-
-              <textarea
-                id="withdrawNote"
-                rows="3"
-                placeholder="Additional information"></textarea>
-
-            </div>
-
-
-            <button
-              class="btn-primary"
-              type="submit">
-
-              Send Withdraw Request
-
-            </button>
-
-          </form>
-
-        </div>
-
-      </div>
-
-
-      <!-- TRANSACTION HISTORY -->
-
-      <div class="grid-2 mt">
-
-        <div class="card">
-
-          <h3>
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            Deposit History
-          </h3>
-
-          <div
-            id="depositHistoryList"
-            class="list">
-          </div>
-
-        </div>
-
-
-        <div class="card">
-
-          <h3>
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            Withdrawal History
-          </h3>
-
-          <div
-            id="withdrawHistoryList"
-            class="list">
-          </div>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- BOTTOM NAVIGATION -->
-
-    <nav class="app-bottom-nav">
-
-      <button
-        class="tab active"
-        data-panel="dashboard"
-        type="button">
-
-        <i class="fa-solid fa-house"></i>
-        Home
-
-      </button>
-
-
-      <button
-        class="tab"
-        data-panel="jobs"
-        type="button">
-
-        <i class="fa-solid fa-briefcase"></i>
-        Jobs
-
-      </button>
-
-
-      <button
-        class="tab"
-        data-panel="tasks"
-        type="button">
-
-        <i class="fa-solid fa-list-check"></i>
-        Tasks
-
-      </button>
-
-
-      <button
-        class="tab"
-        data-panel="wallet"
-        type="button">
-
-        <i class="fa-solid fa-wallet"></i>
-        Wallet
-
-      </button>
-
-    </nav>
-
-  </section>
+</section>
 
 </main>
 
+
+<!-- BOTTOM NAVIGATION -->
+
+<nav class="bottom-nav">
+
+<button class="nav-btn active" data-go="dashboard" type="button">
+<i class="fa-solid fa-house"></i>
+Home
+</button>
+
+<button class="nav-btn" data-go="jobs" type="button">
+<i class="fa-solid fa-briefcase"></i>
+Jobs
+</button>
+
+<button class="nav-btn" data-go="post" type="button">
+<i class="fa-solid fa-circle-plus"></i>
+Post Job
+</button>
+
+<button class="nav-btn" data-go="wallet" type="button">
+<i class="fa-solid fa-wallet"></i>
+Wallet
+</button>
+
+<button class="nav-btn" data-go="profile" type="button">
+<i class="fa-solid fa-user"></i>
+Profile
+</button>
+
+</nav>
+
+</section>
 
 <script type="module" src="./app.js"></script>
 
