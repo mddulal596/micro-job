@@ -1,268 +1,468 @@
-import { auth, db } from "../firebase-config.js";
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
+  getAuth,
   onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-
+  signInWithEmailAndPassword,
+  signOut,
+  getIdTokenResult
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
+  getFirestore,
   collection,
-  doc,
-  getDocs,
   query,
-  limit,
+  where,
+  onSnapshot,
+  doc,
   updateDoc
-} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { firebaseConfig } from "../firebase-config.js";
 
-const $ = (id) => document.getElementById(id);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-let activePageId = null;
+const adminAuthBox = document.getElementById("adminAuthBox");
+const adminDeniedBox = document.getElementById("adminDeniedBox");
+const adminApp = document.getElementById("adminApp");
+const adminMessage = document.getElementById("adminMessage");
+const adminLogoutBtn = document.getElementById("adminLogoutBtn");
 
-const pageMap = {
-  usersPage: { collectionName: "users", containerId: "usersList" },
-  jobsPage: { collectionName: "jobs", containerId: "jobsList" },
-  tasksPage: { collectionName: "tasks", containerId: "tasksList" },
-  depositsPage: { collectionName: "deposits", containerId: "depositsList" },
-  withdrawalsPage: { collectionName: "withdrawals", containerId: "withdrawalsList" }
-};
+const adminLoginForm = document.getElementById("adminLoginForm");
+const adminEmail = document.getElementById("adminEmail");
+const adminPassword = document.getElementById("adminPassword");
 
-function safe(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+const adminStats = document.getElementById("adminStats");
+const pendingJobsList = document.getElementById("pendingJobsList");
+const pendingTasksList = document.getElementById("pendingTasksList");
+const pendingDepositsList = document.getElementById("pendingDepositsList");
+const pendingWithdrawalsList = document.getElementById("pendingWithdrawalsList");
+const usersList = document.getElementById("usersList");
+
+let unsubscribers = [];
+let currentAdminUser = null;
+
+let pendingJobs = [];
+let pendingTasks = [];
+let pendingDeposits = [];
+let pendingWithdrawals = [];
+let allUsers = [];
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, (match) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;"
-  })[c]);
+  }[match]));
 }
 
-function show(id) {
-  $(id).classList.remove("hidden");
+function formatMoney(value) {
+  const number = Number(value || 0);
+  return `৳${number.toLocaleString("en-BD", { maximumFractionDigits: 2 })}`;
 }
 
-function hide(id) {
-  $(id).classList.add("hidden");
+function toDate(ts) {
+  if (!ts) return null;
+  if (typeof ts.toDate === "function") return ts.toDate();
+  if (ts.seconds) return new Date(ts.seconds * 1000);
+  return null;
 }
 
-function denyAccess() {
-  hide("loading");
-  hide("adminApp");
-  show("accessDenied");
+function formatTime(ts) {
+  const d = toDate(ts);
+  return d ? d.toLocaleString("bn-BD") : "—";
 }
 
-async function loadDashboard() {
-  try {
-    const [usersSnap, jobsSnap, tasksSnap] = await Promise.all([
-      getDocs(query(collection(db, "users"), limit(100))),
-      getDocs(query(collection(db, "jobs"), limit(100))),
-      getDocs(query(collection(db, "tasks"), limit(100)))
-    ]);
-
-    const users = usersSnap.docs.map((d) => d.data());
-    const jobs = jobsSnap.docs.map((d) => d.data());
-    const tasks = tasksSnap.docs.map((d) => d.data());
-
-    $("totalUsers").textContent = users.length;
-    $("totalJobs").textContent = jobs.length;
-    $("pendingJobs").textContent = jobs.filter((job) => job.status === "pending").length;
-    $("pendingTasks").textContent = tasks.filter((task) => task.status === "pending").length;
-  } catch (error) {
-    console.error(error);
-  }
+function truncate(text = "", limit = 180) {
+  const s = String(text);
+  return s.length > limit ? `${s.slice(0, limit)}...` : s;
 }
 
-function getApproveStatus(collectionName) {
-  if (collectionName === "jobs") return "active";
-  if (collectionName === "tasks") return "approved";
-  if (collectionName === "deposits") return "approved";
-  if (collectionName === "withdrawals") return "approved";
-  return "approved";
+function statusChip(status) {
+  const safe = escapeHtml(status || "pending");
+  return `<span class="chip ${safe}">${safe}</span>`;
 }
 
-function actionButtons(collectionName, docId, currentStatus) {
-  if (collectionName === "users") return "";
-  if (currentStatus !== "pending") return "";
-
-  const approveStatus = getApproveStatus(collectionName);
-
-  return `
-    <div class="action-row">
-      <button class="action-btn approve" data-action="approve" data-collection="${collectionName}" data-id="${docId}" data-status="${approveStatus}">
-        Approve
-      </button>
-      <button class="action-btn reject" data-action="reject" data-collection="${collectionName}" data-id="${docId}" data-status="rejected">
-        Reject
-      </button>
-    </div>
-  `;
+function setMessage(text, type = "success") {
+  adminMessage.textContent = text;
+  adminMessage.className = `message ${type}`;
+  adminMessage.classList.remove("hidden");
 }
 
-async function changeStatus(collectionName, docId, newStatus) {
-  try {
-    await updateDoc(doc(db, collectionName, docId), {
-      status: newStatus
-    });
-
-    alert(`Updated successfully: ${newStatus}`);
-
-    await loadDashboard();
-
-    if (activePageId && pageMap[activePageId]) {
-      const meta = pageMap[activePageId];
-      await loadCollection(meta.collectionName, meta.containerId);
-    }
-  } catch (error) {
-    console.error(error);
-    alert("Status update failed: " + error.message);
-  }
+function clearMessage() {
+  adminMessage.textContent = "";
+  adminMessage.className = "message hidden";
 }
 
-async function loadCollection(collectionName, containerId) {
-  const container = $(containerId);
-  container.textContent = "Loading...";
-
-  try {
-    const snap = await getDocs(
-      query(collection(db, collectionName), limit(100))
-    );
-
-    container.replaceChildren();
-
-    if (snap.empty) {
-      container.textContent = "No records found.";
-      return;
-    }
-
-    snap.forEach((documentSnapshot) => {
-      const data = documentSnapshot.data();
-      const id = documentSnapshot.id;
-      const status = data.status || "unknown";
-
-      const card = document.createElement("div");
-      card.className = "item-card";
-
-      let html = "";
-
-      if (collectionName === "users") {
-        html = `
-          <h4>${safe(data.name || "User")}</h4>
-          <p>Email: ${safe(data.email || "-")}</p>
-          <p>Phone: ${safe(data.phone || "-")}</p>
-          <p>Balance: ৳${Number(data.balance || 0).toFixed(2)}</p>
-          <p>Role: ${safe(data.role || "user")}</p>
-          <p>Referral Code: ${safe(data.referral_code || "-")}</p>
-        `;
-      }
-
-      if (collectionName === "jobs") {
-        html = `
-          <h4>${safe(data.title || "Untitled Job")}</h4>
-          <p>Category: ${safe(data.category || "-")}</p>
-          <p>Payment: ৳${Number(data.payment || 0).toFixed(2)}</p>
-          <p>Workers: ${safe(data.workers ?? "-")}</p>
-          <p>Owner UID: ${safe(data.userId || "-")}</p>
-          <span class="status ${safe(status)}">${safe(status)}</span>
-          ${actionButtons(collectionName, id, status)}
-        `;
-      }
-
-      if (collectionName === "tasks") {
-        html = `
-          <h4>Task Submission</h4>
-          <p>Job ID: ${safe(data.jobId || "-")}</p>
-          <p>User ID: ${safe(data.userId || "-")}</p>
-          <p>Proof: <a href="${safe(data.proof || "#")}" target="_blank" rel="noopener noreferrer">Open Proof</a></p>
-          <p>Message: ${safe(data.message || "-")}</p>
-          <span class="status ${safe(status)}">${safe(status)}</span>
-          ${actionButtons(collectionName, id, status)}
-        `;
-      }
-
-      if (collectionName === "deposits") {
-        html = `
-          <h4>Deposit Request</h4>
-          <p>User ID: ${safe(data.userId || "-")}</p>
-          <p>Method: ${safe(data.method || "-")}</p>
-          <p>Amount: ৳${Number(data.amount || 0).toFixed(2)}</p>
-          <p>TRX ID: ${safe(data.trxId || "-")}</p>
-          <span class="status ${safe(status)}">${safe(status)}</span>
-          ${actionButtons(collectionName, id, status)}
-        `;
-      }
-
-      if (collectionName === "withdrawals") {
-        html = `
-          <h4>Withdrawal Request</h4>
-          <p>User ID: ${safe(data.userId || "-")}</p>
-          <p>Method: ${safe(data.method || "-")}</p>
-          <p>Account Number: ${safe(data.accountNumber || "-")}</p>
-          <p>Amount: ৳${Number(data.amount || 0).toFixed(2)}</p>
-          <span class="status ${safe(status)}">${safe(status)}</span>
-          ${actionButtons(collectionName, id, status)}
-        `;
-      }
-
-      card.innerHTML = html;
-      container.appendChild(card);
-    });
-
-    container.querySelectorAll("[data-action]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const collectionName = button.dataset.collection;
-        const id = button.dataset.id;
-        const status = button.dataset.status;
-        button.disabled = true;
-        await changeStatus(collectionName, id, status);
-      });
-    });
-  } catch (error) {
-    console.error(error);
-    container.textContent = "Unable to load records: " + error.message;
-  }
+function showAuthBox() {
+  adminAuthBox.classList.remove("hidden");
+  adminDeniedBox.classList.add("hidden");
+  adminApp.classList.add("hidden");
+  adminLogoutBtn.classList.add("hidden");
+  clearMessage();
 }
 
-document.querySelectorAll(".menu-grid button").forEach((button) => {
-  button.addEventListener("click", async () => {
-    document.querySelectorAll(".admin-page").forEach((page) => {
-      page.classList.add("hidden");
-    });
+function showDeniedBox() {
+  adminAuthBox.classList.add("hidden");
+  adminDeniedBox.classList.remove("hidden");
+  adminApp.classList.add("hidden");
+  adminLogoutBtn.classList.remove("hidden");
+  clearMessage();
+}
 
-    activePageId = button.dataset.page;
-    $(activePageId).classList.remove("hidden");
+function showAdminApp() {
+  adminAuthBox.classList.add("hidden");
+  adminDeniedBox.classList.add("hidden");
+  adminApp.classList.remove("hidden");
+  adminLogoutBtn.classList.remove("hidden");
+}
 
-    const meta = pageMap[activePageId];
-    if (meta) {
-      await loadCollection(meta.collectionName, meta.containerId);
+function cleanListeners() {
+  unsubscribers.forEach((unsub) => {
+    try {
+      unsub();
+    } catch (error) {
+      console.warn(error);
     }
   });
+  unsubscribers = [];
+}
+
+function listenRef(unsub) {
+  unsubscribers.push(unsub);
+  return unsub;
+}
+
+function renderStats() {
+  const cards = [
+    { label: "Pending Jobs", value: pendingJobs.length },
+    { label: "Pending Tasks", value: pendingTasks.length },
+    { label: "Pending Deposits", value: pendingDeposits.length },
+    { label: "Pending Withdrawals", value: pendingWithdrawals.length }
+  ];
+
+  adminStats.innerHTML = cards.map((item) => `
+    <div class="stats-card">
+      <div class="label">${escapeHtml(item.label)}</div>
+      <div class="value">${escapeHtml(String(item.value))}</div>
+    </div>
+  `).join("");
+}
+
+function renderPendingJobs() {
+  if (!pendingJobs.length) {
+    pendingJobsList.innerHTML = `<div class="empty">No pending job.</div>`;
+    return;
+  }
+
+  pendingJobsList.innerHTML = pendingJobs.map((job) => `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <h4>${escapeHtml(job.title)}</h4>
+          <div class="meta">
+            <span>Reward: ${formatMoney(job.reward)}</span>
+            <span>Creator: ${escapeHtml(job.creatorName || job.creatorEmail || "Unknown")}</span>
+          </div>
+        </div>
+        ${statusChip(job.status)}
+      </div>
+      <p>${escapeHtml(truncate(job.description || "", 240))}</p>
+      <div class="meta">
+        <span>Created: ${formatTime(job.createdAt)}</span>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn primary" type="button" data-collection="jobs" data-id="${job.id}" data-status="active">Approve</button>
+        <button class="btn secondary" type="button" data-collection="jobs" data-id="${job.id}" data-status="rejected">Reject</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderPendingTasks() {
+  if (!pendingTasks.length) {
+    pendingTasksList.innerHTML = `<div class="empty">No pending task.</div>`;
+    return;
+  }
+
+  pendingTasksList.innerHTML = pendingTasks.map((task) => `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <h4>${escapeHtml(task.jobTitle || "Task")}</h4>
+          <div class="meta">
+            <span>Submitted by: ${escapeHtml(task.submittedByName || "Unknown")}</span>
+            <span>Owner: ${escapeHtml(task.jobOwnerName || "Unknown")}</span>
+          </div>
+        </div>
+        ${statusChip(task.status)}
+      </div>
+      <p><strong>Proof:</strong></p>
+      <p>${escapeHtml(truncate(task.proof || "", 260))}</p>
+      <div class="meta">
+        <span>Created: ${formatTime(task.createdAt)}</span>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn primary" type="button" data-collection="tasks" data-id="${task.id}" data-status="approved">Approve</button>
+        <button class="btn secondary" type="button" data-collection="tasks" data-id="${task.id}" data-status="rejected">Reject</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderPendingDeposits() {
+  if (!pendingDeposits.length) {
+    pendingDepositsList.innerHTML = `<div class="empty">No pending deposit.</div>`;
+    return;
+  }
+
+  pendingDepositsList.innerHTML = pendingDeposits.map((item) => `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <h4>${escapeHtml(item.method)} Deposit</h4>
+          <div class="meta">
+            <span>Amount: ${formatMoney(item.amount)}</span>
+            <span>Txn: ${escapeHtml(item.transactionId || "-")}</span>
+            <span>User: ${escapeHtml(item.name || item.email || "Unknown")}</span>
+          </div>
+        </div>
+        ${statusChip(item.status)}
+      </div>
+      ${item.note ? `<p>${escapeHtml(truncate(item.note, 220))}</p>` : ""}
+      <div class="meta">
+        <span>Created: ${formatTime(item.createdAt)}</span>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn primary" type="button" data-collection="deposits" data-id="${item.id}" data-status="approved">Approve</button>
+        <button class="btn secondary" type="button" data-collection="deposits" data-id="${item.id}" data-status="rejected">Reject</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderPendingWithdrawals() {
+  if (!pendingWithdrawals.length) {
+    pendingWithdrawalsList.innerHTML = `<div class="empty">No pending withdrawal.</div>`;
+    return;
+  }
+
+  pendingWithdrawalsList.innerHTML = pendingWithdrawals.map((item) => `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <h4>${escapeHtml(item.method)} Withdrawal</h4>
+          <div class="meta">
+            <span>Amount: ${formatMoney(item.amount)}</span>
+            <span>Account: ${escapeHtml(item.accountNumber || "-")}</span>
+            <span>User: ${escapeHtml(item.name || item.email || "Unknown")}</span>
+          </div>
+        </div>
+        ${statusChip(item.status)}
+      </div>
+      ${item.note ? `<p>${escapeHtml(truncate(item.note, 220))}</p>` : ""}
+      <div class="meta">
+        <span>Created: ${formatTime(item.createdAt)}</span>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn primary" type="button" data-collection="withdrawals" data-id="${item.id}" data-status="approved">Approve</button>
+        <button class="btn secondary" type="button" data-collection="withdrawals" data-id="${item.id}" data-status="rejected">Reject</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderUsers() {
+  if (!allUsers.length) {
+    usersList.innerHTML = `<div class="empty">No users found.</div>`;
+    return;
+  }
+
+  usersList.innerHTML = allUsers.map((user) => `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <h4>${escapeHtml(user.name || "No name")}</h4>
+          <div class="meta">
+            <span>Email: ${escapeHtml(user.email || "-")}</span>
+            <span>UID: ${escapeHtml(user.uid || "-")}</span>
+          </div>
+        </div>
+        <span class="chip active">Balance: ${formatMoney(user.balance || 0)}</span>
+      </div>
+      <div class="meta">
+        <span>Created: ${formatTime(user.createdAt)}</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderAll() {
+  renderStats();
+  renderPendingJobs();
+  renderPendingTasks();
+  renderPendingDeposits();
+  renderPendingWithdrawals();
+  renderUsers();
+}
+
+async function loadAdminData(uid) {
+  const jobsUnsub = onSnapshot(
+    query(collection(db, "jobs"), where("status", "==", "pending")),
+    (snap) => {
+      pendingJobs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+      renderAll();
+    },
+    (error) => setMessage(error.message, "error")
+  );
+  listenRef(jobsUnsub);
+
+  const tasksUnsub = onSnapshot(
+    query(collection(db, "tasks"), where("status", "==", "pending")),
+    (snap) => {
+      pendingTasks = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+      renderAll();
+    },
+    (error) => setMessage(error.message, "error")
+  );
+  listenRef(tasksUnsub);
+
+  const depositsUnsub = onSnapshot(
+    query(collection(db, "deposits"), where("status", "==", "pending")),
+    (snap) => {
+      pendingDeposits = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+      renderAll();
+    },
+    (error) => setMessage(error.message, "error")
+  );
+  listenRef(depositsUnsub);
+
+  const withdrawalsUnsub = onSnapshot(
+    query(collection(db, "withdrawals"), where("status", "==", "pending")),
+    (snap) => {
+      pendingWithdrawals = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+      renderAll();
+    },
+    (error) => setMessage(error.message, "error")
+  );
+  listenRef(withdrawalsUnsub);
+
+  const usersUnsub = onSnapshot(
+    collection(db, "users"),
+    (snap) => {
+      allUsers = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+      renderAll();
+    },
+    (error) => setMessage(error.message, "error")
+  );
+  listenRef(usersUnsub);
+}
+
+async function updateStatus(collectionName, id, status) {
+  await updateDoc(doc(db, collectionName, id), { status });
+  setMessage(`${collectionName} updated to ${status}.`, "success");
+}
+
+document.getElementById("pendingJobsList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-collection='jobs']");
+  if (!btn) return;
+  try {
+    await updateStatus("jobs", btn.dataset.id, btn.dataset.status);
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 });
 
-$("logoutBtn").addEventListener("click", async () => {
-  await signOut(auth);
-  window.location.href = "../index.html";
+document.getElementById("pendingTasksList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-collection='tasks']");
+  if (!btn) return;
+  try {
+    await updateStatus("tasks", btn.dataset.id, btn.dataset.status);
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
+});
+
+document.getElementById("pendingDepositsList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-collection='deposits']");
+  if (!btn) return;
+  try {
+    await updateStatus("deposits", btn.dataset.id, btn.dataset.status);
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
+});
+
+document.getElementById("pendingWithdrawalsList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-collection='withdrawals']");
+  if (!btn) return;
+  try {
+    await updateStatus("withdrawals", btn.dataset.id, btn.dataset.status);
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
+});
+
+adminLoginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearMessage();
+
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      adminEmail.value.trim(),
+      adminPassword.value
+    );
+    adminLoginForm.reset();
+  } catch (error) {
+    setMessage(`Login failed: ${error.message}`, "error");
+  }
+});
+
+adminLogoutBtn.addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    setMessage("Logout successful.", "success");
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 });
 
 onAuthStateChanged(auth, async (user) => {
+  cleanListeners();
+  currentAdminUser = user || null;
+  pendingJobs = [];
+  pendingTasks = [];
+  pendingDeposits = [];
+  pendingWithdrawals = [];
+  allUsers = [];
+  renderAll();
+
   if (!user) {
-    denyAccess();
+    showAuthBox();
     return;
   }
 
   try {
-    const token = await user.getIdTokenResult(true);
-
-    if (token.claims.admin !== true) {
-      denyAccess();
+    const token = await getIdTokenResult(user, true);
+    if (!token.claims.admin) {
+      showDeniedBox();
+      setMessage("You are logged in but not an admin.", "error");
       return;
     }
-
-    hide("loading");
-    hide("accessDenied");
-    show("adminApp");
-
-    await loadDashboard();
   } catch (error) {
-    console.error(error);
-    denyAccess();
+    showDeniedBox();
+    setMessage(`Admin check failed: ${error.message}`, "error");
+    return;
   }
+
+  showAdminApp();
+  await loadAdminData(user.uid);
+  renderAll();
 });
