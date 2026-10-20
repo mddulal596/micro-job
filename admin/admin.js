@@ -1,10 +1,12 @@
 /* ==========================================
    MICRO JOB ADMIN PANEL
-   FIREBASE SPARK TESTING MODE
+   HISTORY SYSTEM - TESTING MODE
+   Firebase SDK 10.12.5
 ========================================== */
 
-import { initializeApp } from
-  "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 
 import {
   getAuth,
@@ -12,42 +14,33 @@ import {
   signInWithEmailAndPassword,
   signOut,
   getIdTokenResult
-} from
-  "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
   getFirestore,
   collection,
-  query,
-  where,
   onSnapshot,
   doc,
   runTransaction,
   serverTimestamp
-} from
-  "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-import { firebaseConfig } from "../firebase-config.js";
+import {
+  firebaseConfig
+} from "../firebase-config.js";
 
 
 /* ==========================================
-   FIREBASE INITIALIZATION
+   FIREBASE
 ========================================== */
 
 const app = initializeApp(firebaseConfig);
-
 const auth = getAuth(app);
-
 const db = getFirestore(app);
 
-
-/* ==========================================
-   CONSTANTS
-========================================== */
+const $ = id => document.getElementById(id);
 
 const MIN_DEPOSIT = 300;
-
-const $ = (id) => document.getElementById(id);
 
 
 /* ==========================================
@@ -55,32 +48,64 @@ const $ = (id) => document.getElementById(id);
 ========================================== */
 
 let currentAdmin = null;
-
 let listeners = [];
-
 let authVersion = 0;
-
 let busy = false;
 
-let pendingJobs = [];
+const records = {
+  jobs: [],
+  tasks: [],
+  deposits: [],
+  withdrawals: [],
+  users: []
+};
 
-let pendingTasks = [];
+const filters = {
+  jobs: "pending",
+  tasks: "pending",
+  deposits: "pending",
+  withdrawals: "pending"
+};
 
-let pendingDeposits = [];
+const settings = {
+  jobs: {
+    panel: "adminJobsPanel",
+    list: "adminJobsList",
+    count: "pendingJobsCount",
+    title: "Jobs"
+  },
 
-let pendingWithdrawals = [];
+  tasks: {
+    panel: "adminTasksPanel",
+    list: "adminTasksList",
+    count: "pendingTasksCount",
+    title: "Tasks"
+  },
 
-let allUsers = [];
+  deposits: {
+    panel: "adminDepositsPanel",
+    list: "adminDepositsList",
+    count: "pendingDepositsCount",
+    title: "Deposits"
+  },
+
+  withdrawals: {
+    panel: "adminWithdrawalsPanel",
+    list: "adminWithdrawalsList",
+    count: "pendingWithdrawalsCount",
+    title: "Withdrawals"
+  }
+};
 
 
 /* ==========================================
-   HELPER FUNCTIONS
+   HELPERS
 ========================================== */
 
 function escapeHtml(value = "") {
   return String(value).replace(
     /[&<>"']/g,
-    (character) => ({
+    character => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",
@@ -90,51 +115,48 @@ function escapeHtml(value = "") {
   );
 }
 
+function text(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  return escapeHtml(value);
+}
 
 function money(value) {
-  const amount = Number(value) || 0;
+  const number = Number(value) || 0;
 
-  return "৳" + amount.toLocaleString("en-BD", {
+  return "৳ " + number.toLocaleString("en-BD", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
 }
 
-
 function dateText(value) {
-  if (!value) {
-    return "—";
-  }
+  if (!value) return "—";
 
   try {
-    const date =
-      typeof value.toDate === "function"
-        ? value.toDate()
-        : value.seconds
-          ? new Date(value.seconds * 1000)
-          : null;
+    const date = value.toDate
+      ? value.toDate()
+      : value.seconds
+        ? new Date(value.seconds * 1000)
+        : null;
 
     return date
       ? date.toLocaleString("bn-BD")
       : "—";
 
-  } catch (error) {
+  } catch {
     return "—";
   }
 }
 
-
-function safeText(value) {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  return escapeHtml(String(value));
-}
-
-
-function chip(status = "pending") {
-  const safe = escapeHtml(status);
+function statusChip(status) {
+  const safe = escapeHtml(status || "pending");
 
   return `
     <span class="status-chip ${safe}">
@@ -143,26 +165,31 @@ function chip(status = "pending") {
   `;
 }
 
-
-function emptyState(text) {
+function emptyState(message) {
   return `
     <div class="empty-state">
-      ${escapeHtml(text)}
+      ${escapeHtml(message)}
     </div>
   `;
 }
 
+function row(label, value) {
+  return `
+    <p>
+      <strong>${escapeHtml(label)}:</strong>
+      ${text(value)}
+    </p>
+  `;
+}
 
-function setMessage(text, type = "success") {
+function message(value, type = "success") {
   const element = $("adminMessage");
 
   if (!element) return;
 
-  element.textContent = text;
-
+  element.textContent = value;
   element.className = "message " + type;
 }
-
 
 function clearMessage() {
   const element = $("adminMessage");
@@ -170,40 +197,36 @@ function clearMessage() {
   if (!element) return;
 
   element.textContent = "";
-
   element.className = "message hidden";
 }
 
-
-function setLoginMessage(text) {
-  const element = $("adminLoginMessage");
-
-  if (!element) return;
-
-  element.textContent = text;
+function loginMessage(value) {
+  $("adminLoginMessage").textContent = value;
 }
-
 
 function showLogin() {
   $("adminLoginView").style.display = "flex";
-
   $("adminDashboardView").style.display = "none";
-
   $("adminLogoutBtn").style.display = "none";
 }
 
-
 function showDashboard() {
   $("adminLoginView").style.display = "none";
-
   $("adminDashboardView").style.display = "block";
-
   $("adminLogoutBtn").style.display = "inline-flex";
 }
 
+function sortNewest(items) {
+  return [...items].sort((a, b) => {
+    const aTime = a.createdAt?.seconds || 0;
+    const bTime = b.createdAt?.seconds || 0;
+
+    return bTime - aTime;
+  });
+}
 
 function stopListeners() {
-  listeners.forEach((unsubscribe) => {
+  listeners.forEach(unsubscribe => {
     try {
       unsubscribe();
     } catch (error) {
@@ -214,53 +237,39 @@ function stopListeners() {
   listeners = [];
 }
 
-
 function resetData() {
-  pendingJobs = [];
-
-  pendingTasks = [];
-
-  pendingDeposits = [];
-
-  pendingWithdrawals = [];
-
-  allUsers = [];
+  Object.keys(records).forEach(key => {
+    records[key] = [];
+  });
 
   updateCounts();
-
   renderAll();
 }
 
 
 /* ==========================================
-   ADMIN LOGIN
+   LOGIN
 ========================================== */
 
 $("adminLoginForm").addEventListener(
   "submit",
-  async (event) => {
+  async event => {
     event.preventDefault();
 
     const email = $("adminEmail").value.trim();
-
     const password = $("adminPassword").value;
 
-    const submitButton =
-      $("adminLoginForm").querySelector(
-        'button[type="submit"]'
-      );
+    const button = $("adminLoginForm").querySelector(
+      'button[type="submit"]'
+    );
 
     if (!email || !password) {
-      setLoginMessage(
-        "ইমেইল এবং পাসওয়ার্ড লিখুন।"
-      );
-
+      loginMessage("ইমেইল ও পাসওয়ার্ড লিখুন।");
       return;
     }
 
-    submitButton.disabled = true;
-
-    setLoginMessage("লগইন হচ্ছে...");
+    button.disabled = true;
+    loginMessage("লগইন হচ্ছে...");
 
     try {
       await signInWithEmailAndPassword(
@@ -269,27 +278,22 @@ $("adminLoginForm").addEventListener(
         password
       );
 
-      setLoginMessage(
-        "অ্যাকাউন্ট যাচাই করা হচ্ছে..."
-      );
+      loginMessage("Admin অনুমতি যাচাই হচ্ছে...");
 
     } catch (error) {
-      console.error("Admin login error:", error);
-
-      setLoginMessage(
-        "লগইন ব্যর্থ হয়েছে। ইমেইল ও পাসওয়ার্ড যাচাই করুন। " +
-        error.message
+      loginMessage(
+        "লগইন ব্যর্থ হয়েছে: " + error.message
       );
 
     } finally {
-      submitButton.disabled = false;
+      button.disabled = false;
     }
   }
 );
 
 
 /* ==========================================
-   ADMIN LOGOUT
+   LOGOUT
 ========================================== */
 
 $("adminLogoutBtn").addEventListener(
@@ -297,90 +301,68 @@ $("adminLogoutBtn").addEventListener(
   async () => {
     try {
       await signOut(auth);
+
     } catch (error) {
-      setMessage(
-        "Logout করতে সমস্যা হয়েছে: " +
-        error.message,
-        "error"
-      );
+      message(error.message, "error");
     }
   }
 );
 
 
 /* ==========================================
-   AUTH STATE + CUSTOM CLAIM CHECK
+   AUTH + ADMIN CLAIM
 ========================================== */
 
 onAuthStateChanged(
   auth,
-  async (user) => {
+  async user => {
     const version = ++authVersion;
 
     stopListeners();
-
     currentAdmin = null;
-
     resetData();
-
     clearMessage();
 
     if (!user) {
       showLogin();
-
       return;
     }
 
-    setLoginMessage(
-      "Admin অনুমতি যাচাই করা হচ্ছে..."
-    );
+    loginMessage("Admin অনুমতি যাচাই হচ্ছে...");
 
     try {
-      const tokenResult =
-        await getIdTokenResult(user, true);
+      const token = await getIdTokenResult(
+        user,
+        true
+      );
 
-      if (version !== authVersion) {
-        return;
-      }
+      if (version !== authVersion) return;
 
-      const isAdmin =
-        tokenResult.claims.admin === true;
-
-      if (!isAdmin) {
+      if (token.claims.admin !== true) {
         showLogin();
 
-        setLoginMessage(
+        loginMessage(
           "এই অ্যাকাউন্টে Admin অনুমতি নেই।"
         );
 
         await signOut(auth);
-
         return;
       }
 
       currentAdmin = user;
 
-      setLoginMessage("");
-
+      loginMessage("");
       showDashboard();
 
       startListeners();
 
     } catch (error) {
-      console.error(
-        "Admin verification error:",
-        error
-      );
-
-      if (version !== authVersion) {
-        return;
-      }
+      if (version !== authVersion) return;
 
       showLogin();
 
-      setLoginMessage(
-        "Admin যাচাই করা যায়নি: " +
-        error.message
+      loginMessage(
+        "Admin যাচাই ব্যর্থ: " + error.message
       );
     }
   }
@@ -388,10 +370,10 @@ onAuthStateChanged(
 
 
 /* ==========================================
-   ADMIN TAB NAVIGATION
+   MAIN NAVIGATION
 ========================================== */
 
-const tabPanels = {
+const panels = {
   jobs: "adminJobsPanel",
   tasks: "adminTasksPanel",
   deposits: "adminDepositsPanel",
@@ -399,43 +381,174 @@ const tabPanels = {
   users: "adminUsersPanel"
 };
 
+document.querySelectorAll(
+  "[data-admin-tab]"
+).forEach(button => {
+  button.addEventListener("click", () => {
+    const selected = button.dataset.adminTab;
 
-document
-  .querySelectorAll("[data-admin-tab]")
-  .forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const selected =
-          button.dataset.adminTab;
+    if (!panels[selected]) return;
 
-        if (!tabPanels[selected]) {
-          return;
-        }
+    document.querySelectorAll(
+      "[data-admin-tab]"
+    ).forEach(tab => {
+      tab.classList.toggle(
+        "active",
+        tab === button
+      );
+    });
 
-        document
-          .querySelectorAll("[data-admin-tab]")
-          .forEach((tab) => {
-            tab.classList.remove("active");
-          });
-
-        button.classList.add("active");
-
-        Object.entries(tabPanels).forEach(
-          ([name, panelId]) => {
-            const panel = $(panelId);
-
-            if (panel) {
-              panel.style.display =
-                name === selected
-                  ? "block"
-                  : "none";
-            }
-          }
-        );
+    Object.entries(panels).forEach(
+      ([name, id]) => {
+        $(id).style.display =
+          name === selected
+            ? "block"
+            : "none";
       }
     );
   });
+});
+
+
+/* ==========================================
+   HISTORY FILTER BUTTONS
+========================================== */
+
+function createHistoryFilters() {
+  Object.entries(settings).forEach(
+    ([collectionName, config]) => {
+      const panel = $(config.panel);
+      const list = $(config.list);
+
+      if (!panel || !list) return;
+
+      const wrapper = document.createElement("div");
+
+      wrapper.className = "history-filters";
+
+      wrapper.style.cssText = `
+        display:flex;
+        gap:8px;
+        overflow-x:auto;
+        padding:12px 0;
+        margin:10px 0;
+      `;
+
+      wrapper.innerHTML = `
+        <button
+          type="button"
+          class="history-filter active"
+          data-history-collection="${collectionName}"
+          data-history-status="pending"
+        >
+          Pending
+        </button>
+
+        <button
+          type="button"
+          class="history-filter"
+          data-history-collection="${collectionName}"
+          data-history-status="approved"
+        >
+          Approved
+        </button>
+
+        <button
+          type="button"
+          class="history-filter"
+          data-history-collection="${collectionName}"
+          data-history-status="rejected"
+        >
+          Rejected
+        </button>
+
+        <button
+          type="button"
+          class="history-filter"
+          data-history-collection="${collectionName}"
+          data-history-status="all"
+        >
+          All History
+        </button>
+      `;
+
+      panel.insertBefore(wrapper, list);
+
+      const buttons = wrapper.querySelectorAll(
+        ".history-filter"
+      );
+
+      buttons.forEach(button => {
+        button.style.cssText = `
+          border:1px solid #e2e8f0;
+          background:white;
+          color:#475569;
+          border-radius:10px;
+          padding:10px 13px;
+          font-size:13px;
+          font-weight:700;
+          white-space:nowrap;
+          cursor:pointer;
+          flex-shrink:0;
+        `;
+      });
+
+      setFilterStyle(wrapper, "pending");
+    }
+  );
+}
+
+function setFilterStyle(wrapper, selected) {
+  wrapper.querySelectorAll(
+    ".history-filter"
+  ).forEach(button => {
+    const active =
+      button.dataset.historyStatus === selected;
+
+    button.style.background =
+      active ? "#5145e5" : "#ffffff";
+
+    button.style.color =
+      active ? "#ffffff" : "#475569";
+
+    button.style.borderColor =
+      active ? "#5145e5" : "#e2e8f0";
+  });
+}
+
+document.addEventListener(
+  "click",
+  event => {
+    const button = event.target.closest(
+      "[data-history-collection][data-history-status]"
+    );
+
+    if (!button) return;
+
+    const name = button.dataset.historyCollection;
+    const status = button.dataset.historyStatus;
+
+    if (!settings[name]) return;
+
+    if (![
+      "pending",
+      "approved",
+      "rejected",
+      "all"
+    ].includes(status)) {
+      return;
+    }
+
+    filters[name] = status;
+
+    setFilterStyle(
+      button.parentElement,
+      status
+    );
+
+    renderCollection(name);
+  }
+);
 
 
 /* ==========================================
@@ -443,37 +556,18 @@ document
 ========================================== */
 
 function updateCounts() {
-  $("pendingJobsCount").textContent =
-    pendingJobs.length;
+  Object.entries(settings).forEach(
+    ([name, config]) => {
+      const count = records[name].filter(
+        item => item.status === "pending"
+      ).length;
 
-  $("pendingTasksCount").textContent =
-    pendingTasks.length;
-
-  $("pendingDepositsCount").textContent =
-    pendingDeposits.length;
-
-  $("pendingWithdrawalsCount").textContent =
-    pendingWithdrawals.length;
+      $(config.count).textContent = count;
+    }
+  );
 
   $("totalUsersCount").textContent =
-    allUsers.length;
-}
-
-
-/* ==========================================
-   SORT DATA
-========================================== */
-
-function sortNewest(items) {
-  return [...items].sort((a, b) => {
-    const aTime =
-      a.createdAt?.seconds || 0;
-
-    const bTime =
-      b.createdAt?.seconds || 0;
-
-    return bTime - aTime;
-  });
+    records.users.length;
 }
 
 
@@ -484,161 +578,131 @@ function sortNewest(items) {
 function startListeners() {
   stopListeners();
 
-  listenPending(
+  [
     "jobs",
-    (data) => {
-      pendingJobs = data;
-
-      renderJobs();
-    }
-  );
-
-  listenPending(
     "tasks",
-    (data) => {
-      pendingTasks = data;
-
-      renderTasks();
-    }
-  );
-
-  listenPending(
     "deposits",
-    (data) => {
-      pendingDeposits = data;
+    "withdrawals"
+  ].forEach(name => {
+    const unsubscribe = onSnapshot(
+      collection(db, name),
 
-      renderDeposits();
-    }
-  );
-
-  listenPending(
-    "withdrawals",
-    (data) => {
-      pendingWithdrawals = data;
-
-      renderWithdrawals();
-    }
-  );
-
-  listenUsers();
-}
-
-
-function listenPending(
-  collectionName,
-  callback
-) {
-  const reference = query(
-    collection(db, collectionName),
-
-    where("status", "==", "pending")
-  );
-
-  const unsubscribe = onSnapshot(
-    reference,
-
-    (snapshot) => {
-      const data = snapshot.docs.map(
-        (item) => ({
-          id: item.id,
-          ...item.data()
-        })
-      );
-
-      callback(sortNewest(data));
-
-      updateCounts();
-    },
-
-    (error) => {
-      console.error(
-        collectionName + " listener error:",
-        error
-      );
-
-      setMessage(
-        collectionName +
-        " লোড করা যাচ্ছে না: " +
-        error.message,
-        "error"
-      );
-
-      const listId = {
-        jobs: "adminJobsList",
-        tasks: "adminTasksList",
-        deposits: "adminDepositsList",
-        withdrawals: "adminWithdrawalsList"
-      }[collectionName];
-
-      if (listId && $(listId)) {
-        $(listId).innerHTML = emptyState(
-          "ডেটা লোড করতে সমস্যা হয়েছে।"
+      snapshot => {
+        records[name] = sortNewest(
+          snapshot.docs.map(item => ({
+            ...item.data(),
+            id: item.id
+          }))
         );
+
+        updateCounts();
+        renderCollection(name);
+      },
+
+      error => {
+        console.error(name, error);
+
+        message(
+          name + " লোড হয়নি: " +
+          error.message,
+          "error"
+        );
+
+        $(settings[name].list).innerHTML =
+          emptyState(
+            "History লোড করতে সমস্যা হয়েছে: " +
+            error.message
+          );
       }
-    }
-  );
+    );
 
-  listeners.push(unsubscribe);
-}
+    listeners.push(unsubscribe);
+  });
 
-
-function listenUsers() {
-  const unsubscribe = onSnapshot(
+  const usersListener = onSnapshot(
     collection(db, "users"),
 
-    (snapshot) => {
-      allUsers = sortNewest(
-        snapshot.docs.map(
-          (item) => ({
-            id: item.id,
-            ...item.data()
-          })
-        )
+    snapshot => {
+      records.users = sortNewest(
+        snapshot.docs.map(item => ({
+          ...item.data(),
+          id: item.id
+        }))
       );
-
-      renderUsers();
 
       updateCounts();
+      renderUsers();
     },
 
-    (error) => {
-      console.error(
-        "Users listener error:",
-        error
-      );
+    error => {
+      console.error(error);
 
       $("adminUsersList").innerHTML =
         emptyState(
           "Users লোড করতে সমস্যা হয়েছে: " +
           error.message
         );
-
-      setMessage(
-        "Users লোড করা যাচ্ছে না: " +
-        error.message,
-        "error"
-      );
     }
   );
 
-  listeners.push(unsubscribe);
+  listeners.push(usersListener);
 }
 
 
 /* ==========================================
-   ACTION BUTTON HTML
+   FILTER LOGIC
+========================================== */
+
+function getFilteredData(name) {
+  const selected = filters[name];
+
+  if (selected === "all") {
+    return records[name];
+  }
+
+  if (
+    name === "jobs" &&
+    selected === "approved"
+  ) {
+    return records.jobs.filter(
+      item =>
+        item.status === "active" ||
+        item.status === "approved"
+    );
+  }
+
+  return records[name].filter(
+    item => item.status === selected
+  );
+}
+
+
+/* ==========================================
+   ACTION BUTTONS
 ========================================== */
 
 function actionButtons(
-  collectionName,
-  documentId,
+  name,
+  id,
+  status,
   allowApprove = true
 ) {
-  const safeCollection =
-    escapeHtml(collectionName);
+  if (status !== "pending") {
+    return `
+      <div class="admin-actions">
+        ${statusChip(status)}
+        <span style="
+          color:#64748b;
+          font-size:13px;
+        ">
+          Already Processed
+        </span>
+      </div>
+    `;
+  }
 
-  const safeId =
-    escapeHtml(documentId);
+  const safeName = escapeHtml(name);
+  const safeId = escapeHtml(id);
 
   return `
     <div class="admin-actions">
@@ -650,7 +714,7 @@ function actionButtons(
               type="button"
               class="approve-btn"
               data-action="approve"
-              data-collection="${safeCollection}"
+              data-collection="${safeName}"
               data-id="${safeId}"
             >
               <i class="fa-solid fa-check"></i>
@@ -664,7 +728,7 @@ function actionButtons(
         type="button"
         class="reject-btn"
         data-action="reject"
-        data-collection="${safeCollection}"
+        data-collection="${safeName}"
         data-id="${safeId}"
       >
         <i class="fa-solid fa-xmark"></i>
@@ -677,414 +741,343 @@ function actionButtons(
 
 
 /* ==========================================
-   RENDER JOBS
+   JOB CARD
 ========================================== */
 
-function renderJobs() {
-  const container = $("adminJobsList");
+function jobCard(job) {
+  return `
+    <article class="admin-item">
 
-  if (!pendingJobs.length) {
-    container.innerHTML = emptyState(
-      "কোনো Pending Job নেই।"
-    );
+      <div class="admin-item-header">
+        <div>
+          <h3 class="admin-item-title">
+            ${text(job.title)}
+          </h3>
 
-    return;
-  }
-
-  container.innerHTML = pendingJobs.map(
-    (job) => `
-      <article class="admin-item">
-
-        <div class="admin-item-header">
-
-          <div>
-            <h3 class="admin-item-title">
-              ${safeText(job.title)}
-            </h3>
-
-            <div class="admin-item-subtitle">
-              ${dateText(job.createdAt)}
-            </div>
+          <div class="admin-item-subtitle">
+            ${dateText(job.createdAt)}
           </div>
-
-          ${chip(job.status)}
-
         </div>
 
-        <div class="admin-item-body">
+        ${statusChip(job.status)}
+      </div>
 
-          <p>
-            <strong>Posted By:</strong>
-            ${safeText(job.creatorName)}
-          </p>
+      <div class="admin-item-body">
 
-          <p>
-            <strong>Email:</strong>
-            ${safeText(job.creatorEmail)}
-          </p>
+        ${row("Posted By", job.creatorName)}
 
-          <p>
-            <strong>Reward:</strong>
-            ${money(job.reward)}
-          </p>
+        ${row("Email", job.creatorEmail)}
 
-          <p>
-            <strong>Description:</strong>
-          </p>
+        ${row("Reward", money(job.reward))}
 
-          <div class="long-text">
-            ${safeText(job.description)}
-          </div>
+        ${row("Job ID", job.id)}
 
+        <p><strong>Description:</strong></p>
+
+        <div class="long-text">
+          ${text(job.description)}
         </div>
 
-        ${actionButtons("jobs", job.id)}
+      </div>
 
-      </article>
-    `
-  ).join("");
+      ${actionButtons(
+        "jobs",
+        job.id,
+        job.status
+      )}
+
+    </article>
+  `;
 }
 
 
 /* ==========================================
-   RENDER TASKS
+   TASK CARD
 ========================================== */
 
-function renderTasks() {
-  const container = $("adminTasksList");
+function taskCard(task) {
+  return `
+    <article class="admin-item">
 
-  if (!pendingTasks.length) {
-    container.innerHTML = emptyState(
-      "কোনো Pending Task নেই।"
-    );
+      <div class="admin-item-header">
+        <div>
+          <h3 class="admin-item-title">
+            ${text(task.jobTitle)}
+          </h3>
 
-    return;
-  }
-
-  container.innerHTML = pendingTasks.map(
-    (task) => `
-      <article class="admin-item">
-
-        <div class="admin-item-header">
-
-          <div>
-
-            <h3 class="admin-item-title">
-              ${safeText(task.jobTitle)}
-            </h3>
-
-            <div class="admin-item-subtitle">
-              ${dateText(task.createdAt)}
-            </div>
-
+          <div class="admin-item-subtitle">
+            ${dateText(task.createdAt)}
           </div>
-
-          ${chip(task.status)}
-
         </div>
 
-        <div class="admin-item-body">
+        ${statusChip(task.status)}
+      </div>
 
-          <p>
-            <strong>Worker:</strong>
-            ${safeText(task.workerName || task.name)}
-          </p>
+      <div class="admin-item-body">
 
-          <p>
-            <strong>Email:</strong>
-            ${safeText(task.workerEmail || task.email)}
-          </p>
-
-          <p>
-            <strong>Job ID:</strong>
-            ${safeText(task.jobId)}
-          </p>
-
-          <p>
-            <strong>Proof:</strong>
-          </p>
-
-          <div class="long-text">
-            ${safeText(task.proof)}
-          </div>
-
-        </div>
-
-        ${actionButtons("tasks", task.id)}
-
-      </article>
-    `
-  ).join("");
-}
-
-
-/* ==========================================
-   RENDER DEPOSITS
-========================================== */
-
-function renderDeposits() {
-  const container = $("adminDepositsList");
-
-  if (!pendingDeposits.length) {
-    container.innerHTML = emptyState(
-      "কোনো Pending Deposit নেই।"
-    );
-
-    return;
-  }
-
-  container.innerHTML = pendingDeposits.map(
-    (deposit) => `
-      <article class="admin-item">
-
-        <div class="admin-item-header">
-
-          <div>
-
-            <h3 class="admin-item-title">
-              ${money(deposit.amount)}
-            </h3>
-
-            <div class="admin-item-subtitle">
-              ${dateText(deposit.createdAt)}
-            </div>
-
-          </div>
-
-          ${chip(deposit.status)}
-
-        </div>
-
-        <div class="admin-item-body">
-
-          <p>
-            <strong>User:</strong>
-            ${safeText(deposit.name)}
-          </p>
-
-          <p>
-            <strong>Email:</strong>
-            ${safeText(deposit.email)}
-          </p>
-
-          <p>
-            <strong>Method:</strong>
-            ${safeText(deposit.method)}
-          </p>
-
-          <p>
-            <strong>Transaction ID:</strong>
-            ${safeText(deposit.transactionId)}
-          </p>
-
-          <p>
-            <strong>User UID:</strong>
-            ${safeText(deposit.uid)}
-          </p>
-
-          <p>
-            <strong>Note:</strong>
-            ${safeText(deposit.note)}
-          </p>
-
-        </div>
-
-        <div class="testing-warning">
-          <i class="fa-solid fa-circle-info"></i>
-          এটি Test Deposit। Approve করলে
-          যোগ্য ব্যবহারকারীর Lifetime Work
-          Access চালু হতে পারে। কোনো
-          বাস্তব ব্যালেন্স যোগ হবে না।
-        </div>
-
-        ${actionButtons(
-          "deposits",
-          deposit.id,
-          Number(deposit.amount) >= MIN_DEPOSIT
+        ${row(
+          "Worker",
+          task.workerName ||
+          task.name ||
+          task.userName
         )}
 
-      </article>
-    `
-  ).join("");
+        ${row(
+          "Email",
+          task.workerEmail ||
+          task.email ||
+          task.userEmail
+        )}
+
+        ${row(
+          "Worker UID",
+          task.uid ||
+          task.workerId
+        )}
+
+        ${row("Job ID", task.jobId)}
+
+        <p><strong>Proof:</strong></p>
+
+        <div class="long-text">
+          ${text(task.proof)}
+        </div>
+
+      </div>
+
+      ${actionButtons(
+        "tasks",
+        task.id,
+        task.status
+      )}
+
+    </article>
+  `;
 }
 
 
 /* ==========================================
-   RENDER WITHDRAWALS
+   DEPOSIT CARD
 ========================================== */
 
-function renderWithdrawals() {
-  const container =
-    $("adminWithdrawalsList");
+function depositCard(deposit) {
+  return `
+    <article class="admin-item">
 
-  if (!pendingWithdrawals.length) {
+      <div class="admin-item-header">
+        <div>
+          <h3 class="admin-item-title">
+            ${money(deposit.amount)}
+          </h3>
+
+          <div class="admin-item-subtitle">
+            ${dateText(deposit.createdAt)}
+          </div>
+        </div>
+
+        ${statusChip(deposit.status)}
+      </div>
+
+      <div class="admin-item-body">
+
+        ${row("User", deposit.name)}
+
+        ${row("Email", deposit.email)}
+
+        ${row("Method", deposit.method)}
+
+        ${row(
+          "Transaction ID",
+          deposit.transactionId
+        )}
+
+        ${row("User UID", deposit.uid)}
+
+        ${row("Note", deposit.note)}
+
+      </div>
+
+      <div class="testing-warning">
+        এটি Testing Mode। Deposit Approve
+        করলে Lifetime Work Access চালু
+        হতে পারে, কিন্তু বাস্তব টাকা বা
+        ব্যালেন্স যোগ হবে না।
+      </div>
+
+      ${actionButtons(
+        "deposits",
+        deposit.id,
+        deposit.status,
+        Number(deposit.amount) >= MIN_DEPOSIT
+      )}
+
+    </article>
+  `;
+}
+
+
+/* ==========================================
+   WITHDRAWAL CARD
+========================================== */
+
+function withdrawalCard(item) {
+  return `
+    <article class="admin-item">
+
+      <div class="admin-item-header">
+        <div>
+          <h3 class="admin-item-title">
+            ${money(item.amount)}
+          </h3>
+
+          <div class="admin-item-subtitle">
+            ${dateText(item.createdAt)}
+          </div>
+        </div>
+
+        ${statusChip(item.status)}
+      </div>
+
+      <div class="admin-item-body">
+
+        ${row("User", item.name)}
+
+        ${row("Email", item.email)}
+
+        ${row("Method", item.method)}
+
+        ${row("Account", item.account)}
+
+        ${row("Note", item.note)}
+
+      </div>
+
+      <div class="testing-warning">
+        Testing Mode-এ Withdrawal
+        Approval ও বাস্তব পেমেন্ট বন্ধ।
+      </div>
+
+      ${actionButtons(
+        "withdrawals",
+        item.id,
+        item.status,
+        false
+      )}
+
+    </article>
+  `;
+}
+
+
+/* ==========================================
+   RENDER HISTORY
+========================================== */
+
+function renderCollection(name) {
+  const config = settings[name];
+
+  if (!config) return;
+
+  const container = $(config.list);
+  const data = getFilteredData(name);
+
+  if (!data.length) {
+    const status = filters[name];
+
     container.innerHTML = emptyState(
-      "কোনো Pending Withdrawal নেই।"
+      status === "all"
+        ? "কোনো History পাওয়া যায়নি।"
+        : "কোনো " +
+          status.toUpperCase() +
+          " " +
+          config.title +
+          " নেই।"
+    );
+
+    return;
+  }
+
+  const renderers = {
+    jobs: jobCard,
+    tasks: taskCard,
+    deposits: depositCard,
+    withdrawals: withdrawalCard
+  };
+
+  container.innerHTML =
+    data.map(renderers[name]).join("");
+}
+
+
+/* ==========================================
+   USERS
+========================================== */
+
+function renderUsers() {
+  const container = $("adminUsersList");
+
+  if (!records.users.length) {
+    container.innerHTML = emptyState(
+      "কোনো User পাওয়া যায়নি।"
     );
 
     return;
   }
 
   container.innerHTML =
-    pendingWithdrawals.map(
-      (withdrawal) => `
-        <article class="admin-item">
-
-          <div class="admin-item-header">
-
-            <div>
-
-              <h3 class="admin-item-title">
-                ${money(withdrawal.amount)}
-              </h3>
-
-              <div class="admin-item-subtitle">
-                ${dateText(withdrawal.createdAt)}
-              </div>
-
-            </div>
-
-            ${chip(withdrawal.status)}
-
-          </div>
-
-          <div class="admin-item-body">
-
-            <p>
-              <strong>User:</strong>
-              ${safeText(withdrawal.name)}
-            </p>
-
-            <p>
-              <strong>Email:</strong>
-              ${safeText(withdrawal.email)}
-            </p>
-
-            <p>
-              <strong>Method:</strong>
-              ${safeText(withdrawal.method)}
-            </p>
-
-            <p>
-              <strong>Account:</strong>
-              ${safeText(withdrawal.account)}
-            </p>
-
-            <p>
-              <strong>Note:</strong>
-              ${safeText(withdrawal.note)}
-            </p>
-
-          </div>
-
-          <div class="testing-warning">
-            Testing Mode-এ Withdrawal
-            Approve এবং বাস্তব পেমেন্ট বন্ধ।
-            পুরোনো Pending Request শুধু
-            Reject করা যাবে।
-          </div>
-
-          ${actionButtons(
-            "withdrawals",
-            withdrawal.id,
-            false
-          )}
-
-        </article>
-      `
-    ).join("");
-}
-
-
-/* ==========================================
-   RENDER USERS
-========================================== */
-
-function renderUsers() {
-  const container = $("adminUsersList");
-
-  if (!allUsers.length) {
-    container.innerHTML = emptyState(
-      "কোনো Registered User পাওয়া যায়নি।"
-    );
-
-    return;
-  }
-
-  container.innerHTML = allUsers.map(
-    (user) => `
+    records.users.map(user => `
       <article class="admin-item">
 
-        <div class="admin-item-header">
-
-          <div>
-
-            <h3 class="admin-item-title">
-              ${safeText(user.name)}
-            </h3>
-
-            <div class="admin-item-subtitle">
-              ${safeText(user.email)}
-            </div>
-
-          </div>
-
-        </div>
+        <h3 class="admin-item-title">
+          ${text(user.name)}
+        </h3>
 
         <div class="admin-item-body">
 
-          <p>
-            <strong>UID:</strong>
-            ${safeText(user.uid || user.id)}
-          </p>
+          ${row("Email", user.email)}
 
-          <p>
-            <strong>Main Balance:</strong>
-            ${money(user.mainBalance || 0)}
-          </p>
+          ${row(
+            "UID",
+            user.uid || user.id
+          )}
 
-          <p>
-            <strong>Deposit Balance:</strong>
-            ${money(user.depositBalance || 0)}
-          </p>
+          ${row(
+            "Main Balance",
+            money(user.mainBalance || 0)
+          )}
 
-          <p>
-            <strong>Registered:</strong>
-            ${dateText(user.createdAt)}
-          </p>
+          ${row(
+            "Deposit Balance",
+            money(user.depositBalance || 0)
+          )}
+
+          ${row(
+            "Registered",
+            dateText(user.createdAt)
+          )}
 
         </div>
 
       </article>
-    `
-  ).join("");
+    `).join("");
 }
 
-
-/* ==========================================
-   RENDER ALL
-========================================== */
-
 function renderAll() {
-  renderJobs();
-
-  renderTasks();
-
-  renderDeposits();
-
-  renderWithdrawals();
+  Object.keys(settings).forEach(
+    renderCollection
+  );
 
   renderUsers();
 }
 
 
 /* ==========================================
-   TRANSACTION: STATUS UPDATE
+   SECURE STATUS TRANSACTION
 ========================================== */
 
 async function updateStatus(
-  collectionName,
-  documentId,
+  name,
+  id,
   newStatus
 ) {
   if (!currentAdmin) {
@@ -1093,53 +1086,38 @@ async function updateStatus(
     );
   }
 
-  const allowedCollections = [
-    "jobs",
-    "tasks",
-    "deposits",
-    "withdrawals"
-  ];
-
-  if (!allowedCollections.includes(
-    collectionName
-  )) {
+  if (!settings[name]) {
     throw new Error(
       "Invalid collection."
     );
   }
 
-  if (!["approved", "rejected", "active"].includes(
+  const expectedStatuses = {
+    jobs: ["active", "rejected"],
+    tasks: ["approved", "rejected"],
+    deposits: ["approved", "rejected"],
+    withdrawals: ["rejected"]
+  };
+
+  if (!expectedStatuses[name].includes(
     newStatus
   )) {
     throw new Error(
-      "Invalid status."
+      "এই Action অনুমোদিত নয়।"
     );
   }
 
-  if (
-    collectionName === "withdrawals" &&
-    newStatus !== "rejected"
-  ) {
-    throw new Error(
-      "Testing Mode-এ Withdrawal Approve বন্ধ।"
-    );
-  }
-
-  const reference = doc(
-    db,
-    collectionName,
-    documentId
-  );
+  const reference = doc(db, name, id);
 
   await runTransaction(
     db,
-    async (transaction) => {
+    async transaction => {
       const snapshot =
         await transaction.get(reference);
 
       if (!snapshot.exists()) {
         throw new Error(
-          "ডকুমেন্ট পাওয়া যায়নি।"
+          "রিকোয়েস্ট পাওয়া যায়নি।"
         );
       }
 
@@ -1147,37 +1125,30 @@ async function updateStatus(
 
       if (data.status !== "pending") {
         throw new Error(
-          "এই রিকোয়েস্ট ইতিমধ্যে প্রসেস করা হয়েছে।"
+          "রিকোয়েস্ট ইতিমধ্যে প্রসেস হয়েছে।"
         );
       }
 
-      /* -------------------------------
-         NORMAL STATUS CHANGE
-      ------------------------------- */
+      /*
+        Jobs, Tasks, Withdrawals
+        and Deposit Rejection:
+        STATUS CHANGE ONLY
+      */
 
       if (
-        collectionName !== "deposits" ||
+        name !== "deposits" ||
         newStatus === "rejected"
       ) {
-        transaction.update(
-          reference,
-          {
-            status: newStatus
-          }
-        );
+        transaction.update(reference, {
+          status: newStatus
+        });
 
         return;
       }
 
-      /* -------------------------------
-         DEPOSIT APPROVAL
-      ------------------------------- */
-
-      if (newStatus !== "approved") {
-        throw new Error(
-          "Invalid deposit action."
-        );
-      }
+      /*
+        TEST DEPOSIT APPROVAL
+      */
 
       const amount = Number(data.amount);
 
@@ -1186,7 +1157,7 @@ async function updateStatus(
         amount < MIN_DEPOSIT
       ) {
         throw new Error(
-          "কমপক্ষে ৳৩০০ Deposit প্রয়োজন।"
+          "ন্যূনতম ৳৩০০ Deposit প্রয়োজন।"
         );
       }
 
@@ -1195,7 +1166,7 @@ async function updateStatus(
         !data.uid
       ) {
         throw new Error(
-          "Deposit User UID পাওয়া যায়নি।"
+          "User UID পাওয়া যায়নি।"
         );
       }
 
@@ -1206,9 +1177,8 @@ async function updateStatus(
       );
 
       /*
-         READ OPERATIONS FIRST
-         Firestore transaction requires
-         reads before writes.
+        Firestore requires all reads
+        before transaction writes.
       */
 
       const accessSnapshot =
@@ -1216,37 +1186,22 @@ async function updateStatus(
           accessReference
         );
 
-      /*
-         Existing lifetime activation
-         must never be removed.
-      */
-
       if (
         accessSnapshot.exists() &&
         accessSnapshot.data().workEnabled !== true
       ) {
         throw new Error(
-          "আগের Access Document পাওয়া গেছে, " +
-          "কিন্তু এটি Active নয়। " +
-          "ম্যানুয়ালি যাচাই করুন।"
+          "Existing Access Document Active নয়।"
         );
       }
 
-      /*
-         Approve the test deposit.
-         This does NOT credit money.
-      */
-
-      transaction.update(
-        reference,
-        {
-          status: "approved"
-        }
-      );
+      transaction.update(reference, {
+        status: "approved"
+      });
 
       /*
-         First approved deposit creates
-         permanent work activation.
+        First approval creates
+        lifetime activation.
       */
 
       if (!accessSnapshot.exists()) {
@@ -1254,9 +1209,7 @@ async function updateStatus(
           accessReference,
           {
             workEnabled: true,
-
-            verifiedDepositId: documentId,
-
+            verifiedDepositId: id,
             activatedAt: serverTimestamp()
           }
         );
@@ -1267,50 +1220,26 @@ async function updateStatus(
 
 
 /* ==========================================
-   ADMIN ACTION HANDLER
+   APPROVE / REJECT HANDLER
 ========================================== */
 
 document.addEventListener(
   "click",
-  async (event) => {
+  async event => {
     const button = event.target.closest(
       "[data-action][data-collection][data-id]"
     );
 
-    if (!button) {
-      return;
-    }
-
-    if (busy) {
-      return;
-    }
+    if (!button || busy) return;
 
     const action = button.dataset.action;
-
-    const collectionName =
-      button.dataset.collection;
-
-    const documentId =
-      button.dataset.id;
-
-    const allowedCollections = [
-      "jobs",
-      "tasks",
-      "deposits",
-      "withdrawals"
-    ];
+    const name = button.dataset.collection;
+    const id = button.dataset.id;
 
     if (
-      !allowedCollections.includes(
-        collectionName
-      )
+      !["approve", "reject"].includes(action) ||
+      !settings[name]
     ) {
-      return;
-    }
-
-    if (!["approve", "reject"].includes(
-      action
-    )) {
       return;
     }
 
@@ -1319,7 +1248,7 @@ document.addEventListener(
     if (action === "reject") {
       newStatus = "rejected";
 
-    } else if (collectionName === "jobs") {
+    } else if (name === "jobs") {
       newStatus = "active";
 
     } else {
@@ -1327,18 +1256,18 @@ document.addEventListener(
     }
 
     if (
-      collectionName === "withdrawals" &&
+      name === "withdrawals" &&
       action === "approve"
     ) {
-      setMessage(
-        "Testing Mode-এ Withdrawal Approve বন্ধ।",
+      message(
+        "Withdrawal Approval বন্ধ।",
         "error"
       );
 
       return;
     }
 
-    let confirmationText =
+    let confirmText =
       "আপনি কি এই রিকোয়েস্ট " +
       (action === "approve"
         ? "Approve"
@@ -1346,72 +1275,49 @@ document.addEventListener(
       " করতে চান?";
 
     if (
-      collectionName === "deposits" &&
+      name === "deposits" &&
       action === "approve"
     ) {
-      confirmationText =
-        "এটি শুধুমাত্র TEST Deposit Approval।\n\n" +
-        "Approve করলে ব্যবহারকারীর Lifetime " +
-        "Work Access চালু হতে পারে।\n\n" +
-        "কোনো বাস্তব টাকা বা ব্যালেন্স যোগ হবে না।\n\n" +
+      confirmText =
+        "TEST DEPOSIT APPROVAL\n\n" +
+        "এতে Lifetime Work Access " +
+        "চালু হতে পারে।\n\n" +
+        "কোনো বাস্তব ব্যালেন্স যোগ হবে না।\n\n" +
         "আপনি কি নিশ্চিত?";
     }
 
     if (
-      collectionName === "tasks" &&
+      name === "tasks" &&
       action === "approve"
     ) {
-      confirmationText =
+      confirmText =
         "Task Approve করবেন?\n\n" +
-        "Testing Mode-এ Worker-এর " +
-        "ব্যালেন্সে টাকা যোগ হবে না।";
+        "Testing Mode-এ Worker Balance " +
+        "পরিবর্তন হবে না।";
     }
 
-    const confirmed =
-      window.confirm(confirmationText);
-
-    if (!confirmed) {
+    if (!window.confirm(confirmText)) {
       return;
     }
 
     busy = true;
-
     button.disabled = true;
 
     clearMessage();
 
     try {
       await updateStatus(
-        collectionName,
-        documentId,
+        name,
+        id,
         newStatus
       );
 
-      let successMessage =
-        "রিকোয়েস্ট সফলভাবে আপডেট হয়েছে।";
-
-      if (
-        collectionName === "deposits" &&
-        newStatus === "approved"
-      ) {
-        successMessage =
-          "Test Deposit Approved। " +
-          "প্রথমবার যোগ্য Deposit হলে " +
-          "Lifetime Work Access চালু হয়েছে। " +
-          "বাস্তব ব্যালেন্স পরিবর্তন হয়নি।";
-      }
-
-      if (
-        collectionName === "tasks" &&
-        newStatus === "approved"
-      ) {
-        successMessage =
-          "Task Approved। Testing Mode-এ " +
-          "Worker Balance পরিবর্তন হয়নি।";
-      }
-
-      setMessage(
-        successMessage,
+      message(
+        "রিকোয়েস্ট সফলভাবে " +
+        (newStatus === "active"
+          ? "Active"
+          : newStatus) +
+        " হয়েছে। History থেকে দেখতে পারবেন।",
         "success"
       );
 
@@ -1421,14 +1327,10 @@ document.addEventListener(
       });
 
     } catch (error) {
-      console.error(
-        "Admin action error:",
-        error
-      );
+      console.error(error);
 
-      setMessage(
-        "কাজটি সম্পন্ন হয়নি: " +
-        error.message,
+      message(
+        "সমস্যা হয়েছে: " + error.message,
         "error"
       );
 
@@ -1442,13 +1344,15 @@ document.addEventListener(
 
 
 /* ==========================================
-   INITIAL UI
+   INITIALIZATION
 ========================================== */
+
+createHistoryFilters();
 
 showLogin();
 
 resetData();
 
 console.log(
-  "Micro Job Admin Panel Loaded - Testing Mode"
+  "Micro Job Admin History System Loaded"
 );
