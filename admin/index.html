@@ -1,127 +1,83 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="bn">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Micro Job - Admin Panel</title>
-
-  <link rel="stylesheet" href="admin.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Micro Job Admin</title>
+  <link rel="stylesheet" href="./admin.css" />
 </head>
 <body>
-
-  <div id="loading" class="loading">
-    <i class="fas fa-spinner fa-spin"></i>
-    <p>Checking Admin Access...</p>
-  </div>
-
-  <div id="accessDenied" class="access-denied hidden">
-    <i class="fas fa-lock"></i>
-    <h2>Access Denied</h2>
-    <p>আপনার Admin Permission নেই অথবা Login করা হয়নি।</p>
-    <a href="../index.html">Back to Login</a>
-  </div>
-
-  <div id="adminApp" class="hidden">
-    <header class="admin-header">
-      <div class="brand">
-        <i class="fas fa-shield-halved"></i>
-        Micro Job Admin
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>Micro Job Admin</h1>
+        <p>Admin claim required</p>
       </div>
 
-      <button id="logoutBtn" class="logout-btn" type="button">
-        <i class="fas fa-right-from-bracket"></i>
-      </button>
+      <div class="topbar-actions">
+        <a class="link-btn" href="../">Back to Site</a>
+        <button id="adminLogoutBtn" class="btn secondary hidden" type="button">Logout</button>
+      </div>
     </header>
 
-    <main class="admin-container">
-      <section class="welcome">
-        <h2>Admin Dashboard 👑</h2>
-        <p>Manage your Micro Job platform</p>
-      </section>
+    <section id="adminAuthBox" class="card">
+      <h2>Admin Login</h2>
+      <p class="muted">শুধু admin custom claim থাকা account access করতে পারবে।</p>
 
-      <div class="stats-grid">
-        <div class="stat-card">
-          <i class="fas fa-users"></i>
-          <h3 id="totalUsers">0</h3>
-          <p>Total Users</p>
+      <form id="adminLoginForm" class="form">
+        <div class="field">
+          <label for="adminEmail">Email</label>
+          <input id="adminEmail" type="email" placeholder="Admin email" required />
+        </div>
+        <div class="field">
+          <label for="adminPassword">Password</label>
+          <input id="adminPassword" type="password" placeholder="Password" required />
+        </div>
+        <button class="btn primary" type="submit">Login as Admin</button>
+      </form>
+    </section>
+
+    <section id="adminDeniedBox" class="card hidden">
+      <h2>Access Denied</h2>
+      <p class="muted">আপনার account এ admin claim নেই।</p>
+    </section>
+
+    <section id="adminApp" class="hidden">
+      <div id="adminMessage" class="message hidden"></div>
+
+      <div id="adminStats" class="stats-grid"></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Pending Jobs</h3>
+          <div id="pendingJobsList" class="list"></div>
         </div>
 
-        <div class="stat-card">
-          <i class="fas fa-briefcase"></i>
-          <h3 id="totalJobs">0</h3>
-          <p>Total Jobs</p>
-        </div>
-
-        <div class="stat-card">
-          <i class="fas fa-clock"></i>
-          <h3 id="pendingJobs">0</h3>
-          <p>Pending Jobs</p>
-        </div>
-
-        <div class="stat-card">
-          <i class="fas fa-list-check"></i>
-          <h3 id="pendingTasks">0</h3>
-          <p>Pending Tasks</p>
+        <div class="card">
+          <h3>Pending Tasks</h3>
+          <div id="pendingTasksList" class="list"></div>
         </div>
       </div>
 
-      <h3 class="section-title">Management</h3>
+      <div class="grid-2 mt">
+        <div class="card">
+          <h3>Pending Deposits</h3>
+          <div id="pendingDepositsList" class="list"></div>
+        </div>
 
-      <div class="menu-grid">
-        <button type="button" data-page="usersPage">
-          <i class="fas fa-users"></i>
-          <span>Users</span>
-        </button>
-
-        <button type="button" data-page="jobsPage">
-          <i class="fas fa-briefcase"></i>
-          <span>Jobs</span>
-        </button>
-
-        <button type="button" data-page="tasksPage">
-          <i class="fas fa-clipboard-check"></i>
-          <span>Tasks</span>
-        </button>
-
-        <button type="button" data-page="depositsPage">
-          <i class="fas fa-arrow-down"></i>
-          <span>Deposits</span>
-        </button>
-
-        <button type="button" data-page="withdrawalsPage">
-          <i class="fas fa-arrow-up"></i>
-          <span>Withdrawals</span>
-        </button>
+        <div class="card">
+          <h3>Pending Withdrawals</h3>
+          <div id="pendingWithdrawalsList" class="list"></div>
+        </div>
       </div>
 
-      <section id="usersPage" class="admin-page hidden">
-        <h3>Users Management</h3>
-        <div id="usersList"></div>
-      </section>
+      <div class="card mt">
+        <h3>Users</h3>
+        <div id="usersList" class="list"></div>
+      </div>
+    </section>
+  </main>
 
-      <section id="jobsPage" class="admin-page hidden">
-        <h3>Jobs Management</h3>
-        <div id="jobsList"></div>
-      </section>
-
-      <section id="tasksPage" class="admin-page hidden">
-        <h3>Task Submissions</h3>
-        <div id="tasksList"></div>
-      </section>
-
-      <section id="depositsPage" class="admin-page hidden">
-        <h3>Deposit Requests</h3>
-        <div id="depositsList"></div>
-      </section>
-
-      <section id="withdrawalsPage" class="admin-page hidden">
-        <h3>Withdrawal Requests</h3>
-        <div id="withdrawalsList"></div>
-      </section>
-    </main>
-  </div>
-
-  <script type="module" src="admin.js"></script>
+  <script type="module" src="./admin.js"></script>
 </body>
 </html>
