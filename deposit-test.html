@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deposit API Test - Micro Job</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+      background: #f5f3ff;
+      color: #1f2937;
+    }
+
+    .card {
+      max-width: 480px;
+      margin: 20px auto;
+      padding: 22px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    h2 {
+      color: #7c3aed;
+      text-align: center;
+      margin-top: 0;
+    }
+
+    h3 {
+      color: #4c1d95;
+      margin-top: 24px;
+    }
+
+    p {
+      line-height: 1.6;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 13px;
+      margin: 8px 0;
+      border: 1px solid #ddd6fe;
+      border-radius: 8px;
+      font-size: 15px;
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #7c3aed;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .green {
+      background: #16a34a;
+    }
+
+    .blue {
+      background: #2563eb;
+    }
+
+    .red {
+      background: #dc2626;
+    }
+
+    .warning {
+      padding: 12px;
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    pre {
+      background: #f3f4f6;
+      padding: 14px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h2>Micro Job</h2>
+
+    <p style="text-align:center">
+      Deposit API Testing
+    </p>
+
+    <div class="warning">
+      ⚠️ TESTING MODE — এখানে কোনো আসল টাকা পাঠাবেন না।
+      শুধু কাল্পনিক Transaction ID ব্যবহার করুন।
+      এই পেজ থেকে কোনো Wallet Balance বাড়বে না।
+    </div>
+
+    <div id="loginSection">
+      <h3>Firebase Login</h3>
+
+      <input
+        type="email"
+        id="email"
+        placeholder="Email"
+        autocomplete="username"
+      >
+
+      <input
+        type="password"
+        id="password"
+        placeholder="Password"
+        autocomplete="current-password"
+      >
+
+      <button id="loginBtn">Login</button>
+    </div>
+
+    <div id="testSection" class="hidden">
+      <p id="userInfo" class="muted"></p>
+
+      <h3>১. Deposit Request Test</h3>
+
+      <label for="amount">Amount (BDT)</label>
+
+      <input
+        type="number"
+        id="amount"
+        min="1"
+        max="100000"
+        step="1"
+        value="300"
+      >
+
+      <label for="paymentMethod">Payment Method</label>
+
+      <select id="paymentMethod">
+        <option value="bkash">bKash</option>
+        <option value="nagad">Nagad</option>
+        <option value="rocket">Rocket</option>
+      </select>
+
+      <label for="transactionId">Test Transaction ID</label>
+
+      <input
+        type="text"
+        id="transactionId"
+        placeholder="TEST-ONLY-ID"
+      >
+
+      <label for="senderNumber">Test Sender Number</label>
+
+      <input
+        type="text"
+        id="senderNumber"
+        value="01000000000"
+      >
+
+      <button id="submitBtn" class="green">
+        Submit Test Deposit
+      </button>
+
+      <h3>২. My Deposit Requests</h3>
+
+      <button id="myDepositsBtn" class="blue">
+        Load My Deposits
+      </button>
+
+      <h3>৩. Admin Test</h3>
+
+      <button id="adminDepositsBtn">
+        Load Admin Deposits
+      </button>
+
+      <button id="logoutBtn" class="red">
+        Logout
+      </button>
+    </div>
+
+    <h3>API Result</h3>
+
+    <pre id="result">
+প্রথমে Firebase Login করুন।
+    </pre>
+  </div>
+
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+    import {
+      firebaseConfig
+    } from "./firebase-config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const API =
+      "https://microjob-secure-api.mddulalhosen6.workers.dev";
+
+    const loginSection =
+      document.getElementById("loginSection");
+
+    const testSection =
+      document.getElementById("testSection");
+
+    const userInfo =
+      document.getElementById("userInfo");
+
+    const result =
+      document.getElementById("result");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const submitBtn =
+      document.getElementById("submitBtn");
+
+    const myDepositsBtn =
+      document.getElementById("myDepositsBtn");
+
+    const adminDepositsBtn =
+      document.getElementById("adminDepositsBtn");
+
+    function showResult(data) {
+      result.textContent =
+        JSON.stringify(data, null, 2);
+    }
+
+    function makeTestTransactionId() {
+      const id =
+        "TEST-" + crypto.randomUUID()
+          .replace(/-/g, "")
+          .slice(0, 16)
+          .toUpperCase();
+
+      document.getElementById("transactionId").value = id;
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        loginSection.classList.add("hidden");
+        testSection.classList.remove("hidden");
+
+        userInfo.textContent =
+          "Logged in UID: " + user.uid;
+
+        makeTestTransactionId();
+
+        showResult({
+          success: true,
+          message: "Login successful. Ready for deposit testing."
+        });
+      } else {
+        loginSection.classList.remove("hidden");
+        testSection.classList.add("hidden");
+
+        result.textContent =
+          "প্রথমে Firebase Login করুন।";
+      }
+    });
+
+    loginBtn.addEventListener("click", async () => {
+      const email =
+        document.getElementById("email").value.trim();
+
+      const password =
+        document.getElementById("password").value;
+
+      if (!email || !password) {
+        showResult({
+          success: false,
+          message: "Email ও Password দিন।"
+        });
+        return;
+      }
+
+      loginBtn.disabled = true;
+
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Login failed",
+          code: error.code || "unknown"
+        });
+      } finally {
+        loginBtn.disabled = false;
+      }
+    });
+
+    async function callApi(path, method = "GET", body = null) {
+      const user = auth.currentUser;
+
+      if (!user) {
+        throw new Error("Login required");
+      }
+
+      const token = await user.getIdToken(true);
+
+      const options = {
+        method,
+        headers: {
+          "Authorization": "Bearer " + token
+        },
+        cache: "no-store"
+      };
+
+      if (body !== null) {
+        options.headers["Content-Type"] =
+          "application/json";
+
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(
+        API + path,
+        options
+      );
+
+      const data = await response.json();
+
+      return {
+        httpStatus: response.status,
+        ...data
+      };
+    }
+
+    submitBtn.addEventListener("click", async () => {
+      const amount = Number(
+        document.getElementById("amount").value
+      );
+
+      const paymentMethod =
+        document.getElementById("paymentMethod").value;
+
+      const transactionId =
+        document.getElementById("transactionId")
+          .value.trim();
+
+      const senderNumber =
+        document.getElementById("senderNumber")
+          .value.trim();
+
+      submitBtn.disabled = true;
+
+      result.textContent =
+        "Submitting TEST deposit request...";
+
+      try {
+        const data = await callApi(
+          "/deposits/request",
+          "POST",
+          {
+            amount,
+            payment_method: paymentMethod,
+            transaction_id: transactionId,
+            sender_number: senderNumber
+          }
+        );
+
+        showResult(data);
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Request failed"
+        });
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    myDepositsBtn.addEventListener("click", async () => {
+      myDepositsBtn.disabled = true;
+
+      result.textContent =
+        "Loading my deposit requests...";
+
+      try {
+        const data = await callApi(
+          "/deposits/my"
+        );
+
+        showResult(data);
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Could not load deposits"
+        });
+      } finally {
+        myDepositsBtn.disabled = false;
+      }
+    });
+
+    adminDepositsBtn.addEventListener("click", async () => {
+      adminDepositsBtn.disabled = true;
+
+      result.textContent =
+        "Loading admin deposit requests...";
+
+      try {
+        const data = await callApi(
+          "/admin/deposits"
+        );
+
+        showResult(data);
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Admin request failed"
+        });
+      } finally {
+        adminDepositsBtn.disabled = false;
+      }
+    });
+
+    document.getElementById("logoutBtn")
+      .addEventListener("click", async () => {
+        await signOut(auth);
+      });
+  </script>
+
+</body>
+</html>
