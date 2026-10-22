@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authentication Security Test - Micro Job</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f6fb;
+      color: #252538;
+    }
+
+    header {
+      background: #ffffff;
+      padding: 18px;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    header h1 {
+      margin: 0;
+      color: #7138d8;
+      font-size: 25px;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 25px auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: #ffffff;
+      padding: 22px;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.06);
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #7138d8;
+      font-size: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #7138d8;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #aaa;
+    }
+
+    .secondary {
+      background: #16a34a;
+    }
+
+    .logout {
+      background: #dc2626;
+    }
+
+    .result {
+      background: #f3f0ff;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Micro Job</h1>
+  <p>Firebase Authentication Security Test</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Firebase Login</h2>
+
+    <input
+      type="email"
+      id="email"
+      placeholder="Email"
+      autocomplete="username"
+    >
+
+    <input
+      type="password"
+      id="password"
+      placeholder="Password"
+      autocomplete="current-password"
+    >
+
+    <button id="loginBtn">Login</button>
+
+    <button id="logoutBtn" class="logout">
+      Logout
+    </button>
+
+    <div id="loginStatus" class="result">
+      Login status checking...
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Backend Security Test</h2>
+
+    <button id="authBtn" class="secondary">
+      Test User Authentication
+    </button>
+
+    <button id="adminBtn">
+      Test Admin Permission
+    </button>
+
+    <div id="testResult" class="result">
+      এখনো কোনো পরীক্ষা চালানো হয়নি।
+    </div>
+
+    <p class="note">
+      এই পেজ Firebase ID Token শুধু সরাসরি
+      Cloudflare Backend-এ পাঠায়।
+      Token স্ক্রিনে দেখায় না।
+      কোনো টাকা যোগ বা বিয়োগ করে না।
+    </p>
+  </div>
+
+</div>
+
+<script type="module">
+
+  import {
+    initializeApp
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+  import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+  import {
+    firebaseConfig
+  } from "./firebase-config.js";
+
+  const app = initializeApp(firebaseConfig);
+
+  const auth = getAuth(app);
+
+  const API =
+    "https://microjob-secure-api.mddulalhosen6.workers.dev";
+
+  const emailInput = document.getElementById("email");
+  const passwordInput = document.getElementById("password");
+
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  const authBtn = document.getElementById("authBtn");
+  const adminBtn = document.getElementById("adminBtn");
+
+  const loginStatus = document.getElementById("loginStatus");
+  const testResult = document.getElementById("testResult");
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      loginStatus.textContent =
+        "✅ Firebase Login Successful\n" +
+        "User UID: " + user.uid;
+    } else {
+      loginStatus.textContent =
+        "❌ Firebase-এ লগইন করা নেই।";
+    }
+
+    authBtn.disabled = !user;
+    adminBtn.disabled = !user;
+  });
+
+  loginBtn.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      loginStatus.textContent =
+        "Email এবং Password লিখুন।";
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginStatus.textContent = "Logging in...";
+
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      passwordInput.value = "";
+
+    } catch (error) {
+      loginStatus.textContent =
+        "Login failed: " + error.code;
+    } finally {
+      loginBtn.disabled = false;
+    }
+  });
+
+  logoutBtn.addEventListener("click", async () => {
+    await signOut(auth);
+    testResult.textContent =
+      "Logout completed.";
+  });
+
+  async function checkBackend(path) {
+    const user = auth.currentUser;
+
+    if (!user) {
+      testResult.textContent =
+        "আগে Firebase Login করুন।";
+      return;
+    }
+
+    testResult.textContent =
+      "Backend Security Test চলছে...";
+
+    authBtn.disabled = true;
+    adminBtn.disabled = true;
+
+    try {
+      const token = await user.getIdToken(true);
+
+      const response = await fetch(API + path, {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer " + token
+        },
+        cache: "no-store"
+      });
+
+      const result = await response.json();
+
+      testResult.textContent =
+        "HTTP Status: " + response.status +
+        "\nSuccess: " + result.success +
+        "\nAuthenticated: " +
+        (result.authenticated ?? false) +
+        "\nAdmin: " +
+        (result.admin ?? false) +
+        "\nMessage: " +
+        (result.message ?? "No error");
+
+    } catch (error) {
+      testResult.textContent =
+        "❌ Backend Test Failed\n" +
+        "Error: " + error.message;
+    } finally {
+      authBtn.disabled = !auth.currentUser;
+      adminBtn.disabled = !auth.currentUser;
+    }
+  }
+
+  authBtn.addEventListener("click", () => {
+    checkBackend("/auth/check");
+  });
+
+  adminBtn.addEventListener("click", () => {
+    checkBackend("/admin/check");
+  });
+
+</script>
+
+</body>
+</html>
