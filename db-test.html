@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D1 Database Test - Micro Job</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f5f3ff;
+      color: #1f2937;
+    }
+
+    .card {
+      max-width: 460px;
+      margin: 30px auto;
+      padding: 24px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    }
+
+    h2 {
+      color: #7c3aed;
+      text-align: center;
+    }
+
+    p {
+      line-height: 1.6;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      margin: 8px 0;
+      border: 1px solid #ddd6fe;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #7c3aed;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .secondary {
+      background: #16a34a;
+    }
+
+    .logout {
+      background: #dc2626;
+    }
+
+    pre {
+      background: #f3f4f6;
+      padding: 14px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h2>Micro Job</h2>
+    <p>Cloudflare D1 Database Connection Test</p>
+
+    <div id="loginSection">
+      <input
+        type="email"
+        id="email"
+        placeholder="Admin Email"
+        autocomplete="username"
+      >
+
+      <input
+        type="password"
+        id="password"
+        placeholder="Admin Password"
+        autocomplete="current-password"
+      >
+
+      <button id="loginBtn">Admin Login</button>
+    </div>
+
+    <div id="testSection" class="hidden">
+      <p id="userInfo"></p>
+
+      <button id="dbCheckBtn" class="secondary">
+        Check D1 Database
+      </button>
+
+      <button id="logoutBtn" class="logout">
+        Logout
+      </button>
+    </div>
+
+    <pre id="result">প্রথমে Admin Login করুন।</pre>
+  </div>
+
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+    import {
+      firebaseConfig
+    } from "./firebase-config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const API =
+      "https://microjob-secure-api.mddulalhosen6.workers.dev";
+
+    const loginSection =
+      document.getElementById("loginSection");
+
+    const testSection =
+      document.getElementById("testSection");
+
+    const result =
+      document.getElementById("result");
+
+    const userInfo =
+      document.getElementById("userInfo");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const dbCheckBtn =
+      document.getElementById("dbCheckBtn");
+
+    function showResult(data) {
+      result.textContent = JSON.stringify(data, null, 2);
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        loginSection.classList.add("hidden");
+        testSection.classList.remove("hidden");
+
+        userInfo.textContent =
+          "Logged in UID: " + user.uid;
+
+        showResult({
+          success: true,
+          message: "Login successful. এখন D1 Check করুন।"
+        });
+      } else {
+        loginSection.classList.remove("hidden");
+        testSection.classList.add("hidden");
+
+        result.textContent =
+          "প্রথমে Admin Login করুন।";
+      }
+    });
+
+    loginBtn.addEventListener("click", async () => {
+      const email =
+        document.getElementById("email").value.trim();
+
+      const password =
+        document.getElementById("password").value;
+
+      if (!email || !password) {
+        showResult({
+          success: false,
+          message: "Email ও Password দিন।"
+        });
+        return;
+      }
+
+      loginBtn.disabled = true;
+
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Login failed",
+          code: error.code || "unknown"
+        });
+      } finally {
+        loginBtn.disabled = false;
+      }
+    });
+
+    dbCheckBtn.addEventListener("click", async () => {
+      const user = auth.currentUser;
+
+      if (!user) {
+        showResult({
+          success: false,
+          message: "Login required"
+        });
+        return;
+      }
+
+      dbCheckBtn.disabled = true;
+      result.textContent = "Checking D1 Database...";
+
+      try {
+        const token = await user.getIdToken(true);
+
+        const response = await fetch(
+          API + "/admin/db-check",
+          {
+            method: "GET",
+            headers: {
+              "Authorization": "Bearer " + token
+            },
+            cache: "no-store"
+          }
+        );
+
+        const data = await response.json();
+
+        showResult({
+          httpStatus: response.status,
+          ...data
+        });
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Database API request failed"
+        });
+      } finally {
+        dbCheckBtn.disabled = false;
+      }
+    });
+
+    document.getElementById("logoutBtn")
+      .addEventListener("click", async () => {
+        await signOut(auth);
+      });
+  </script>
+
+</body>
+</html>
