@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approval Test - Micro Job</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+      background: #f5f3ff;
+      color: #1f2937;
+    }
+
+    .card {
+      max-width: 520px;
+      margin: 20px auto;
+      padding: 22px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    h2 {
+      color: #7c3aed;
+      text-align: center;
+      margin-top: 0;
+    }
+
+    h3 {
+      margin-top: 24px;
+      color: #4c1d95;
+    }
+
+    p {
+      line-height: 1.6;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 13px;
+      margin: 8px 0;
+      border: 1px solid #ddd6fe;
+      border-radius: 8px;
+      background: white;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #7c3aed;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .green {
+      background: #16a34a;
+    }
+
+    .red {
+      background: #dc2626;
+    }
+
+    .blue {
+      background: #2563eb;
+    }
+
+    .warning {
+      padding: 12px;
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .deposit {
+      margin-top: 12px;
+      padding: 14px;
+      background: #faf5ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 10px;
+    }
+
+    .deposit p {
+      margin: 7px 0;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      padding: 14px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h2>Micro Job</h2>
+
+    <p style="text-align:center">
+      Admin Deposit Approval Testing
+    </p>
+
+    <div class="warning">
+      ⚠️ এটি শুধুমাত্র TESTING MODE।
+      এখানে Approve বা Reject করলে আসল Deposit Status,
+      Wallet Balance কিংবা Ledger পরিবর্তন হবে না।
+      কোনো আসল টাকা পাঠাবেন না।
+    </div>
+
+    <div id="loginSection">
+      <h3>Firebase Admin Login</h3>
+
+      <input
+        type="email"
+        id="email"
+        placeholder="Admin Email"
+        autocomplete="username"
+      >
+
+      <input
+        type="password"
+        id="password"
+        placeholder="Admin Password"
+        autocomplete="current-password"
+      >
+
+      <button id="loginBtn">
+        Login
+      </button>
+    </div>
+
+    <div id="adminSection" class="hidden">
+      <p id="userInfo" class="muted"></p>
+
+      <button id="loadDepositsBtn" class="blue">
+        Load Test Deposits
+      </button>
+
+      <h3>Pending Test Deposits</h3>
+
+      <div id="depositList">
+        তালিকা লোড করুন।
+      </div>
+
+      <h3>Approval Test History</h3>
+
+      <button id="historyBtn">
+        Load Approval Test History
+      </button>
+
+      <button id="logoutBtn" class="red">
+        Logout
+      </button>
+    </div>
+
+    <h3>API Result</h3>
+
+    <pre id="result">
+প্রথমে Firebase Admin Login করুন।
+    </pre>
+  </div>
+
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+    import {
+      firebaseConfig
+    } from "./firebase-config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const API =
+      "https://microjob-secure-api.mddulalhosen6.workers.dev";
+
+    const loginSection =
+      document.getElementById("loginSection");
+
+    const adminSection =
+      document.getElementById("adminSection");
+
+    const userInfo =
+      document.getElementById("userInfo");
+
+    const depositList =
+      document.getElementById("depositList");
+
+    const result =
+      document.getElementById("result");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const loadDepositsBtn =
+      document.getElementById("loadDepositsBtn");
+
+    const historyBtn =
+      document.getElementById("historyBtn");
+
+    function showResult(data) {
+      result.textContent =
+        JSON.stringify(data, null, 2);
+    }
+
+    async function callApi(path, method = "GET", body = null) {
+      const user = auth.currentUser;
+
+      if (!user) {
+        throw new Error("Login required");
+      }
+
+      const token = await user.getIdToken(true);
+
+      const options = {
+        method,
+        cache: "no-store",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      };
+
+      if (body !== null) {
+        options.headers["Content-Type"] =
+          "application/json";
+
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(
+        API + path,
+        options
+      );
+
+      const data = await response.json();
+
+      return {
+        httpStatus: response.status,
+        ...data
+      };
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        loginSection.classList.add("hidden");
+        adminSection.classList.remove("hidden");
+
+        userInfo.textContent =
+          "Logged in UID: " + user.uid;
+
+        showResult({
+          success: true,
+          message:
+            "Login successful. Load Test Deposits চাপুন।"
+        });
+      } else {
+        loginSection.classList.remove("hidden");
+        adminSection.classList.add("hidden");
+
+        depositList.textContent =
+          "তালিকা লোড করুন।";
+
+        result.textContent =
+          "প্রথমে Firebase Admin Login করুন।";
+      }
+    });
+
+    loginBtn.addEventListener("click", async () => {
+      const email =
+        document.getElementById("email").value.trim();
+
+      const password =
+        document.getElementById("password").value;
+
+      if (!email || !password) {
+        showResult({
+          success: false,
+          message: "Email ও Password দিন।"
+        });
+        return;
+      }
+
+      loginBtn.disabled = true;
+
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Login failed",
+          code: error.code || "unknown"
+        });
+      } finally {
+        loginBtn.disabled = false;
+      }
+    });
+
+    async function loadDeposits() {
+      loadDepositsBtn.disabled = true;
+      depositList.textContent =
+        "Loading test deposits...";
+
+      try {
+        const data = await callApi(
+          "/admin/deposits"
+        );
+
+        showResult(data);
+
+        if (
+          data.httpStatus !== 200 ||
+          !Array.isArray(data.deposits)
+        ) {
+          depositList.textContent =
+            "ডিপোজিটের তালিকা লোড করা যায়নি।";
+          return;
+        }
+
+        const deposits = data.deposits.filter(
+          item =>
+            item.status === "pending" &&
+            item.transactionId.startsWith("TEST-")
+        );
+
+        depositList.innerHTML = "";
+
+        if (deposits.length === 0) {
+          depositList.textContent =
+            "কোনো Pending Test Deposit নেই।";
+          return;
+        }
+
+        for (const deposit of deposits) {
+          const box =
+            document.createElement("div");
+
+          box.className = "deposit";
+
+          const title =
+            document.createElement("p");
+
+          title.textContent =
+            `৳${deposit.amountBDT} — ${deposit.paymentMethod}`;
+
+          const tx =
+            document.createElement("p");
+
+          tx.textContent =
+            "Transaction ID: " + deposit.transactionId;
+
+          const uid =
+            document.createElement("p");
+
+          uid.className = "muted";
+          uid.textContent =
+            "User UID: " + deposit.uid;
+
+          const depositId =
+            document.createElement("p");
+
+          depositId.className = "muted";
+          depositId.textContent =
+            "Deposit ID: " + deposit.id;
+
+          const approveBtn =
+            document.createElement("button");
+
+          approveBtn.className = "green";
+          approveBtn.textContent =
+            "TEST Approve";
+
+          const rejectBtn =
+            document.createElement("button");
+
+          rejectBtn.className = "red";
+          rejectBtn.textContent =
+            "TEST Reject";
+
+          approveBtn.addEventListener(
+            "click",
+            () => makeDecision(
+              deposit.id,
+              "approve",
+              approveBtn,
+              rejectBtn
+            )
+          );
+
+          rejectBtn.addEventListener(
+            "click",
+            () => makeDecision(
+              deposit.id,
+              "reject",
+              approveBtn,
+              rejectBtn
+            )
+          );
+
+          box.append(
+            title,
+            tx,
+            uid,
+            depositId,
+            approveBtn,
+            rejectBtn
+          );
+
+          depositList.appendChild(box);
+        }
+      } catch (error) {
+        depositList.textContent =
+          "Network error";
+
+        showResult({
+          success: false,
+          message: "Could not load deposits"
+        });
+      } finally {
+        loadDepositsBtn.disabled = false;
+      }
+    }
+
+    async function makeDecision(
+      depositId,
+      action,
+      approveBtn,
+      rejectBtn
+    ) {
+      const confirmed = confirm(
+        `TEST ONLY: ${action} করবেন?\n\n` +
+        "কোনো Wallet Balance পরিবর্তন হবে না।"
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+
+      result.textContent =
+        "Saving TEST decision...";
+
+      try {
+        const data = await callApi(
+          "/admin/deposits/test-approval",
+          "POST",
+          {
+            depositId,
+            action
+          }
+        );
+
+        showResult(data);
+
+        if (data.httpStatus !== 201) {
+          approveBtn.disabled = false;
+          rejectBtn.disabled = false;
+        }
+
+        if (data.httpStatus === 201) {
+          window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: "smooth"
+          });
+        }
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Test decision request failed"
+        });
+
+        approveBtn.disabled = false;
+        rejectBtn.disabled = false;
+      }
+    }
+
+    async function loadHistory() {
+      historyBtn.disabled = true;
+
+      result.textContent =
+        "Loading approval test history...";
+
+      try {
+        const data = await callApi(
+          "/admin/deposits/approval-tests"
+        );
+
+        showResult(data);
+      } catch (error) {
+        showResult({
+          success: false,
+          message: "Could not load history"
+        });
+      } finally {
+        historyBtn.disabled = false;
+      }
+    }
+
+    loadDepositsBtn.addEventListener(
+      "click",
+      loadDeposits
+    );
+
+    historyBtn.addEventListener(
+      "click",
+      loadHistory
+    );
+
+    document.getElementById("logoutBtn")
+      .addEventListener("click", async () => {
+        await signOut(auth);
+      });
+  </script>
+</body>
+</html>
