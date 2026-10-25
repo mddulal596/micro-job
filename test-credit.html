@@ -1,0 +1,682 @@
+const PROJECT_ID = "micro-job-6325c";
+
+const ALLOWED_ORIGIN =
+  "https://mddulal596.github.io";
+
+const FIREBASE_ISSUER =
+  `https://securetoken.google.com/${PROJECT_ID}`;
+
+const FIREBASE_JWKS_URL =
+  "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
+
+function json(data, status = 200, origin = "") {
+  const headers = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Vary": "Origin"
+  };
+
+  if (origin === ALLOWED_ORIGIN) {
+    headers["Access-Control-Allow-Origin"] =
+      ALLOWED_ORIGIN;
+  }
+
+  return new Response(JSON.stringify(data), {
+    status,
+    headers
+  });
+}
+
+class AuthServiceError extends Error {}
+
+function decodeBase64Url(value) {
+  if (typeof value !== "string") {
+    throw new Error("Invalid token");
+  }
+
+  const normalized = value
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  const padded = normalized.padEnd(
+    Math.ceil(normalized.length / 4) * 4,
+    "="
+  );
+
+  return Uint8Array.from(
+    atob(padded),
+    character => character.charCodeAt(0)
+  );
+}
+
+function decodeJson(value) {
+  const bytes = decodeBase64Url(value);
+
+  return JSON.parse(
+    new TextDecoder().decode(bytes)
+  );
+}
+
+async function verifyFirebaseToken(token) {
+  const parts = token.split(".");
+
+  if (parts.length !== 3) {
+    throw new Error("Invalid Firebase token");
+  }
+
+  const [headerPart, payloadPart, signaturePart] =
+    parts;
+
+  const header = decodeJson(headerPart);
+  const payload = decodeJson(payloadPart);
+
+  if (
+    header.alg !== "RS256" ||
+    typeof header.kid !== "string" ||
+    !header.kid
+  ) {
+    throw new Error("Invalid token header");
+  }
+
+  let response;
+
+  try {
+    response = await fetch(FIREBASE_JWKS_URL);
+  } catch {
+    throw new AuthServiceError(
+      "Firebase verification unavailable"
+    );
+  }
+
+  if (!response.ok) {
+    throw new AuthServiceError(
+      "Firebase verification unavailable"
+    );
+  }
+
+  let jwks;
+
+  try {
+    jwks = await response.json();
+  } catch {
+    throw new AuthServiceError(
+      "Invalid verification response"
+    );
+  }
+
+  const jwk = jwks.keys?.find(
+    key =>
+      key.kid === header.kid &&
+      key.kty === "RSA" &&
+      key.use === "sig"
+  );
+
+  if (!jwk) {
+    throw new Error("Firebase signing key not found");
+  }
+
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      hash: "SHA-256"
+    },
+    false,
+    ["verify"]
+  );
+
+  const signedData = new TextEncoder().encode(
+    `${headerPart}.${payloadPart}`
+  );
+
+  const signature =
+    decodeBase64Url(signaturePart);
+
+  const valid = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    signature,
+    signedData
+  );
+
+  if (!valid) {
+    throw new Error("Invalid Firebase signature");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  if (
+    payload.aud !== PROJECT_ID ||
+    payload.iss !== FIREBASE_ISSUER ||
+    typeof payload.sub !== "string" ||
+    !payload.sub ||
+    payload.sub.length > 128 ||
+    !Number.isInteger(payload.iat) ||
+    !Number.isInteger(payload.exp) ||
+    !Number.isInteger(payload.auth_time) ||
+    payload.iat > now ||
+    payload.auth_time > now ||
+    payload.exp <= now ||
+    payload.exp <= payload.iat ||
+    payload.exp - payload.iat > 3600
+  ) {
+    throw new Error("Invalid Firebase claims");
+  }
+
+  return {
+    uid: payload.sub,
+    admin: payload.admin === true
+  };
+}
+
+async function authenticate(request) {
+  const authorization =
+    request.headers.get("Authorization") || "";
+
+  const match =
+    authorization.match(/^Bearer (.+)$/i);
+
+  if (!match) {
+    throw new Error("Firebase login required");
+  }
+
+  return verifyFirebaseToken(match[1].trim());
+}
+
+async function readJson(request) {
+  const contentType =
+    request.headers.get("Content-Type") || "";
+
+  if (
+    !contentType.toLowerCase()
+      .includes("application/json")
+  ) {
+    throw new Error("JSON request required");
+  }
+
+  const text = await request.text();
+
+  if (text.length > 10000) {
+    throw new Error("Request body too large");
+  }
+
+  let body;
+
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error("Invalid JSON");
+  }
+
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body)
+  ) {
+    throw new Error("JSON object required");
+  }
+
+  return body;
+}
+
+async function databaseCheck(env) {
+  const counts = await env.DB.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM test_wallet_accounts)
+        AS test_wallets,
+      (SELECT COUNT(*) FROM test_wallet_ledger)
+        AS test_ledger_entries,
+      (SELECT COUNT(*) FROM wallet_accounts)
+        AS real_wallets,
+      (SELECT COUNT(*) FROM wallet_ledger)
+        AS real_ledger_entries
+  `).first();
+
+  const trigger = await env.DB.prepare(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'trigger'
+      AND name = 'trg_test_deposit_credit'
+  `).first();
+
+  return {
+    success: true,
+    mode: "TESTING",
+    databaseConnected: true,
+    counts,
+    testCreditTriggerReady: Boolean(trigger),
+    balanceChanged: false
+  };
+}
+
+async function getTestWallet(env, user) {
+  const wallet = await env.DB.prepare(`
+    SELECT
+      uid,
+      main_balance,
+      deposit_balance
+    FROM test_wallet_accounts
+    WHERE uid = ?
+  `).bind(user.uid).first();
+
+  const history = await env.DB.prepare(`
+    SELECT
+      operation_id,
+      amount,
+      balance_type,
+      entry_type,
+      created_at
+    FROM test_wallet_ledger
+    WHERE uid = ?
+    ORDER BY id DESC
+    LIMIT 100
+  `).bind(user.uid).all();
+
+  return {
+    success: true,
+    mode: "TESTING",
+    uid: user.uid,
+    mainBalancePaisa:
+      wallet?.main_balance ?? 0,
+    depositBalancePaisa:
+      wallet?.deposit_balance ?? 0,
+    history: history.results || [],
+    realBalanceChanged: false
+  };
+}
+
+async function creditTestDeposit(env, body) {
+  const depositId = body.depositId;
+
+  if (
+    typeof depositId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      .test(depositId)
+  ) {
+    return {
+      status: 400,
+      data: {
+        success: false,
+        message: "Invalid deposit ID"
+      }
+    };
+  }
+
+  const operationId =
+    `test-deposit-credit:${depositId}`;
+
+  // This read is for early validation only.
+  // The actual INSERT below rechecks eligibility.
+  const deposit = await env.DB.prepare(`
+    SELECT
+      d.id,
+      d.uid,
+      d.amount
+    FROM deposit_requests d
+    INNER JOIN deposit_approval_tests a
+      ON a.deposit_id = d.id
+    WHERE d.id = ?
+      AND d.status = 'pending'
+      AND substr(d.transaction_id, 1, 5) = 'TEST-'
+      AND a.test_result = 'approved_test'
+  `).bind(depositId).first();
+
+  if (!deposit) {
+    return {
+      status: 404,
+      data: {
+        success: false,
+        message:
+          "Eligible approved test deposit not found",
+        realBalanceChanged: false
+      }
+    };
+  }
+
+  const existing = await env.DB.prepare(`
+    SELECT operation_id
+    FROM test_wallet_ledger
+    WHERE operation_id = ?
+  `).bind(operationId).first();
+
+  if (existing) {
+    return {
+      status: 409,
+      data: {
+        success: false,
+        message: "Test deposit already credited",
+        duplicateCreditPrevented: true,
+        realBalanceChanged: false
+      }
+    };
+  }
+
+  /*
+    D1 batch executes transactionally.
+
+    Step 1:
+      Create the isolated test wallet if absent.
+
+    Step 2:
+      Insert one uniquely identified test ledger row.
+
+    The existing D1 trigger performs the wallet
+    balance increase inside the ledger INSERT.
+
+    No separate unconditional UPDATE is used.
+
+    Duplicate INSERT is rejected by the UNIQUE
+    operation_id constraint.
+  */
+
+  let batchResult;
+
+  try {
+    batchResult = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO test_wallet_accounts (
+          uid,
+          main_balance,
+          deposit_balance
+        )
+        VALUES (?, 0, 0)
+        ON CONFLICT(uid) DO NOTHING
+      `).bind(deposit.uid),
+
+      env.DB.prepare(`
+        INSERT INTO test_wallet_ledger (
+          operation_id,
+          uid,
+          amount,
+          balance_type,
+          entry_type
+        )
+        SELECT
+          'test-deposit-credit:' || d.id,
+          d.uid,
+          d.amount,
+          'deposit',
+          'test_deposit_credit'
+        FROM deposit_requests d
+        INNER JOIN deposit_approval_tests a
+          ON a.deposit_id = d.id
+        WHERE d.id = ?
+          AND d.status = 'pending'
+          AND substr(d.transaction_id, 1, 5) = 'TEST-'
+          AND a.test_result = 'approved_test'
+      `).bind(depositId)
+    ]);
+  } catch (error) {
+    // A concurrent or repeated request may have
+    // inserted the unique ledger row first.
+    const duplicate = await env.DB.prepare(`
+      SELECT operation_id
+      FROM test_wallet_ledger
+      WHERE operation_id = ?
+    `).bind(operationId).first();
+
+    if (duplicate) {
+      return {
+        status: 409,
+        data: {
+          success: false,
+          message: "Test deposit already credited",
+          duplicateCreditPrevented: true,
+          realBalanceChanged: false
+        }
+      };
+    }
+
+    console.error(
+      "Test credit transaction failed"
+    );
+
+    return {
+      status: 500,
+      data: {
+        success: false,
+        message: "Test credit transaction failed",
+        realBalanceChanged: false
+      }
+    };
+  }
+
+  // Confirm the INSERT really inserted one row.
+  // This prevents reporting success when the
+  // SELECT produced zero eligible rows.
+  const inserted =
+    batchResult?.[1]?.meta?.changes === 1;
+
+  if (!inserted) {
+    return {
+      status: 409,
+      data: {
+        success: false,
+        message:
+          "Test credit not inserted; eligibility changed",
+        realBalanceChanged: false
+      }
+    };
+  }
+
+  const ledger = await env.DB.prepare(`
+    SELECT
+      operation_id,
+      uid,
+      amount
+    FROM test_wallet_ledger
+    WHERE operation_id = ?
+  `).bind(operationId).first();
+
+  const wallet = ledger
+    ? await env.DB.prepare(`
+        SELECT
+          main_balance,
+          deposit_balance
+        FROM test_wallet_accounts
+        WHERE uid = ?
+      `).bind(ledger.uid).first()
+    : null;
+
+  if (!ledger || !wallet) {
+    return {
+      status: 500,
+      data: {
+        success: false,
+        message:
+          "Test credit verification failed"
+      }
+    };
+  }
+
+  return {
+    status: 201,
+    data: {
+      success: true,
+      mode: "TESTING",
+      message: "Simulated deposit credited",
+      depositId,
+      operationId,
+      uid: ledger.uid,
+      creditedAmountPaisa: ledger.amount,
+      testMainBalancePaisa:
+        wallet.main_balance,
+      testDepositBalancePaisa:
+        wallet.deposit_balance,
+      realBalanceChanged: false,
+      realDepositApproved: false,
+      lifetimeAccessActivated: false
+    }
+  };
+}
+
+export default {
+  async fetch(request, env) {
+    const origin =
+      request.headers.get("Origin") || "";
+
+    if (
+      origin &&
+      origin !== ALLOWED_ORIGIN
+    ) {
+      return json({
+        success: false,
+        message: "Origin not allowed"
+      }, 403);
+    }
+
+    if (request.method === "OPTIONS") {
+      if (origin !== ALLOWED_ORIGIN) {
+        return json({
+          success: false,
+          message: "Origin not allowed"
+        }, 403);
+      }
+
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin":
+            ALLOWED_ORIGIN,
+          "Access-Control-Allow-Methods":
+            "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers":
+            "Authorization, Content-Type",
+          "Access-Control-Max-Age": "600",
+          "Vary": "Origin"
+        }
+      });
+    }
+
+    const url = new URL(request.url);
+
+    const route =
+      `${request.method} ${url.pathname}`;
+
+    if (route === "GET /health") {
+      return json({
+        success: true,
+        service: "microjob-test-credit-api",
+        mode: "TESTING",
+        paymentsEnabled: false,
+        withdrawalsEnabled: false,
+        testCreditEnabled: true,
+        dbBindingAvailable: Boolean(env.DB)
+      }, 200, origin);
+    }
+
+    const routes = new Set([
+      "GET /admin/db-test",
+      "POST /admin/deposits/test-credit",
+      "GET /test-wallet/my"
+    ]);
+
+    if (!routes.has(route)) {
+      return json({
+        success: false,
+        message: "Endpoint not found"
+      }, 404, origin);
+    }
+
+    let user;
+
+    try {
+      user = await authenticate(request);
+    } catch (error) {
+      if (error instanceof AuthServiceError) {
+        return json({
+          success: false,
+          message:
+            "Firebase verification unavailable"
+        }, 503, origin);
+      }
+
+      return json({
+        success: false,
+        message: "Firebase login required"
+      }, 401, origin);
+    }
+
+    const adminRoutes = new Set([
+      "GET /admin/db-test",
+      "POST /admin/deposits/test-credit"
+    ]);
+
+    if (
+      adminRoutes.has(route) &&
+      !user.admin
+    ) {
+      return json({
+        success: false,
+        message: "Admin permission required"
+      }, 403, origin);
+    }
+
+    if (!env.DB) {
+      return json({
+        success: false,
+        message: "D1 binding unavailable"
+      }, 503, origin);
+    }
+
+    try {
+      if (route === "GET /admin/db-test") {
+        return json(
+          await databaseCheck(env),
+          200,
+          origin
+        );
+      }
+
+      if (route === "GET /test-wallet/my") {
+        return json(
+          await getTestWallet(env, user),
+          200,
+          origin
+        );
+      }
+
+      if (
+        route ===
+        "POST /admin/deposits/test-credit"
+      ) {
+        let body;
+
+        try {
+          body = await readJson(request);
+        } catch (error) {
+          return json({
+            success: false,
+            message: error.message
+          }, 400, origin);
+        }
+
+        const result =
+          await creditTestDeposit(env, body);
+
+        return json(
+          result.data,
+          result.status,
+          origin
+        );
+      }
+
+      return json({
+        success: false,
+        message: "Endpoint not found"
+      }, 404, origin);
+
+    } catch (error) {
+      console.error(
+        "Testing Worker request failed"
+      );
+
+      return json({
+        success: false,
+        message: "Internal server error"
+      }, 500, origin);
+    }
+  }
+};
