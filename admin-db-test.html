@@ -2,8 +2,7 @@
 <html lang="bn">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Micro Job - Admin DB Test</title>
 
   <style>
@@ -13,24 +12,24 @@
 
     body {
       margin: 0;
+      padding: 20px;
       font-family: Arial, sans-serif;
       background: #f7f5ff;
       color: #222;
-      padding: 20px;
     }
 
     .card {
       max-width: 460px;
       margin: 30px auto;
-      background: white;
       padding: 24px;
+      background: #fff;
       border-radius: 16px;
       box-shadow: 0 6px 24px rgba(80, 50, 150, .1);
     }
 
     h2 {
-      color: #673ab7;
       margin-top: 0;
+      color: #673ab7;
     }
 
     input, button {
@@ -57,16 +56,21 @@
       opacity: .5;
     }
 
+    .google {
+      background: #fff;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+
     .secondary {
       background: #eee;
       color: #333;
     }
 
     pre {
-      background: #f4f4f4;
       padding: 12px;
+      background: #f4f4f4;
       border-radius: 8px;
-      overflow-x: auto;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
@@ -74,6 +78,13 @@
     .note {
       font-size: 13px;
       color: #666;
+      line-height: 1.6;
+    }
+
+    .divider {
+      text-align: center;
+      margin: 15px 0 5px;
+      color: #888;
     }
   </style>
 </head>
@@ -82,10 +93,11 @@
 
   <div class="card">
     <h2>Micro Job</h2>
+
     <p>Admin Database Security Test</p>
 
     <p class="note">
-      এটি শুধু TESTING MODE-এর জন্য।
+      এটি শুধুমাত্র TESTING MODE-এর জন্য।
       কোনো বাস্তব অর্থ লেনদেন হবে না।
     </p>
 
@@ -101,8 +113,14 @@
       placeholder="Firebase Password"
       autocomplete="current-password">
 
-    <button id="loginBtn">
-      Login
+    <button id="emailLoginBtn">
+      Login with Email
+    </button>
+
+    <div class="divider">অথবা</div>
+
+    <button id="googleLoginBtn" class="google">
+      🔐 Sign in with Google (Admin)
     </button>
 
     <button id="testBtn" disabled>
@@ -125,6 +143,10 @@
 
     import {
       getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
       signInWithEmailAndPassword,
       signOut,
       onAuthStateChanged
@@ -138,8 +160,9 @@
       "https://microjob-test-credit-api.mddulalhosen6.workers.dev";
 
     const app = initializeApp(firebaseConfig);
-
     const auth = getAuth(app);
+
+    const provider = new GoogleAuthProvider();
 
     const emailInput =
       document.getElementById("email");
@@ -147,8 +170,11 @@
     const passwordInput =
       document.getElementById("password");
 
-    const loginBtn =
-      document.getElementById("loginBtn");
+    const emailLoginBtn =
+      document.getElementById("emailLoginBtn");
+
+    const googleLoginBtn =
+      document.getElementById("googleLoginBtn");
 
     const testBtn =
       document.getElementById("testBtn");
@@ -171,13 +197,15 @@
       logoutBtn.disabled = !user;
 
       if (user) {
-        show("Firebase Login সফল। এখন Test চাপুন।");
+        show(
+          "Firebase Login সফল। এখন Test Admin DB Access চাপুন।"
+        );
       } else {
         show("Firebase Login করুন।");
       }
     });
 
-    loginBtn.addEventListener("click", async () => {
+    emailLoginBtn.addEventListener("click", async () => {
       try {
         show("Login হচ্ছে...");
 
@@ -189,17 +217,52 @@
 
         passwordInput.value = "";
 
-        show("Login সফল। এখন Test চাপুন.");
+        show("Email Login সফল।");
 
       } catch (error) {
         passwordInput.value = "";
 
         show({
           success: false,
-          message: "Login failed",
+          message: "Email Login failed",
           code: error.code || "unknown"
         });
       }
+    });
+
+    googleLoginBtn.addEventListener("click", async () => {
+      try {
+        show("Google Login হচ্ছে...");
+
+        await signInWithPopup(auth, provider);
+
+        show("Google Login সফল। এখন Test চাপুন।");
+
+      } catch (error) {
+        if (
+          error.code === "auth/popup-blocked" ||
+          error.code === "auth/operation-not-supported-in-this-environment"
+        ) {
+          show("Redirect Login হচ্ছে...");
+
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+
+        show({
+          success: false,
+          message: "Google Login failed",
+          code: error.code || "unknown"
+        });
+      }
+    });
+
+    getRedirectResult(auth).catch(error => {
+      show({
+        success: false,
+        message: "Google Redirect Login failed",
+        code: error.code || "unknown"
+      });
     });
 
     testBtn.addEventListener("click", async () => {
@@ -211,7 +274,7 @@
       }
 
       try {
-        show("Admin DB পরীক্ষা হচ্ছে...");
+        show("Admin Database পরীক্ষা হচ্ছে...");
 
         const token = await user.getIdToken(true);
 
@@ -242,7 +305,10 @@
 
     logoutBtn.addEventListener("click", async () => {
       await signOut(auth);
+
+      emailInput.value = "";
       passwordInput.value = "";
+
       show("Logout সফল।");
     });
   </script>
