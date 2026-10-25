@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Micro Job - Admin DB Test</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f5ff;
+      color: #222;
+      padding: 20px;
+    }
+
+    .card {
+      max-width: 460px;
+      margin: 30px auto;
+      background: white;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(80, 50, 150, .1);
+    }
+
+    h2 {
+      color: #673ab7;
+      margin-top: 0;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border-radius: 9px;
+      font-size: 15px;
+    }
+
+    input {
+      border: 1px solid #ddd;
+    }
+
+    button {
+      border: none;
+      background: #673ab7;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .5;
+    }
+
+    .secondary {
+      background: #eee;
+      color: #333;
+    }
+
+    pre {
+      background: #f4f4f4;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h2>Micro Job</h2>
+    <p>Admin Database Security Test</p>
+
+    <p class="note">
+      এটি শুধু TESTING MODE-এর জন্য।
+      কোনো বাস্তব অর্থ লেনদেন হবে না।
+    </p>
+
+    <input
+      id="email"
+      type="email"
+      placeholder="Firebase Email"
+      autocomplete="username">
+
+    <input
+      id="password"
+      type="password"
+      placeholder="Firebase Password"
+      autocomplete="current-password">
+
+    <button id="loginBtn">
+      Login
+    </button>
+
+    <button id="testBtn" disabled>
+      Test Admin DB Access
+    </button>
+
+    <button id="logoutBtn"
+            class="secondary"
+            disabled>
+      Logout
+    </button>
+
+    <pre id="result">Login করুন।</pre>
+  </div>
+
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+    import {
+      firebaseConfig
+    } from "./firebase-config.js";
+
+    const API =
+      "https://microjob-test-credit-api.mddulalhosen6.workers.dev";
+
+    const app = initializeApp(firebaseConfig);
+
+    const auth = getAuth(app);
+
+    const emailInput =
+      document.getElementById("email");
+
+    const passwordInput =
+      document.getElementById("password");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const testBtn =
+      document.getElementById("testBtn");
+
+    const logoutBtn =
+      document.getElementById("logoutBtn");
+
+    const result =
+      document.getElementById("result");
+
+    function show(data) {
+      result.textContent =
+        typeof data === "string"
+          ? data
+          : JSON.stringify(data, null, 2);
+    }
+
+    onAuthStateChanged(auth, user => {
+      testBtn.disabled = !user;
+      logoutBtn.disabled = !user;
+
+      if (user) {
+        show("Firebase Login সফল। এখন Test চাপুন।");
+      } else {
+        show("Firebase Login করুন।");
+      }
+    });
+
+    loginBtn.addEventListener("click", async () => {
+      try {
+        show("Login হচ্ছে...");
+
+        await signInWithEmailAndPassword(
+          auth,
+          emailInput.value.trim(),
+          passwordInput.value
+        );
+
+        passwordInput.value = "";
+
+        show("Login সফল। এখন Test চাপুন.");
+
+      } catch (error) {
+        passwordInput.value = "";
+
+        show({
+          success: false,
+          message: "Login failed",
+          code: error.code || "unknown"
+        });
+      }
+    });
+
+    testBtn.addEventListener("click", async () => {
+      const user = auth.currentUser;
+
+      if (!user) {
+        show("আগে Login করুন।");
+        return;
+      }
+
+      try {
+        show("Admin DB পরীক্ষা হচ্ছে...");
+
+        const token = await user.getIdToken(true);
+
+        const response = await fetch(
+          `${API}/admin/db-test`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        show({
+          httpStatus: response.status,
+          ...data
+        });
+
+      } catch (error) {
+        show({
+          success: false,
+          message: "API request failed"
+        });
+      }
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      passwordInput.value = "";
+      show("Logout সফল।");
+    });
+  </script>
+
+</body>
+</html>
