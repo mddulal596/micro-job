@@ -22,7 +22,7 @@
       max-width: 470px;
       margin: 25px auto;
       padding: 24px;
-      background: #fff;
+      background: white;
       border-radius: 16px;
       box-shadow: 0 6px 24px rgba(80, 50, 150, .1);
     }
@@ -37,7 +37,7 @@
       color: #555;
     }
 
-    button, input {
+    input, button {
       width: 100%;
       padding: 13px;
       margin-top: 12px;
@@ -77,6 +77,12 @@
       background: #b3261e;
     }
 
+    .divider {
+      text-align: center;
+      margin: 15px 0 5px;
+      color: #888;
+    }
+
     .note {
       padding: 12px;
       background: #fff4db;
@@ -98,24 +104,44 @@
 </head>
 
 <body>
-
   <div class="card">
     <h2>Micro Job</h2>
     <h3>Test Deposit Credit</h3>
 
     <div class="note">
-      ⚠️ এটি শুধুমাত্র TESTING MODE-এর জন্য।
-      এখানে কোনো বাস্তব টাকা জমা হয় না।
-      Test Balance আসল Wallet-এর Balance নয়।
+      ⚠️ শুধুমাত্র TESTING MODE।
+      এখানে কোনো বাস্তব টাকা জমা বা উত্তোলন হয় না।
+      Test Balance আসল Wallet Balance নয়।
     </div>
 
-    <button id="loginBtn" class="google">
-      🔐 Google Admin Login
+    <h3>Email / Password Login</h3>
+
+    <input
+      id="email"
+      type="email"
+      placeholder="Firebase Email"
+      autocomplete="username">
+
+    <input
+      id="password"
+      type="password"
+      placeholder="Firebase Password"
+      autocomplete="current-password">
+
+    <button id="emailLoginBtn">
+      Login with Email
     </button>
 
-    <button id="logoutBtn"
-            class="secondary"
-            disabled>
+    <div class="divider">অথবা</div>
+
+    <button id="googleLoginBtn" class="google">
+      🔐 Sign in with Google (Admin)
+    </button>
+
+    <button
+      id="logoutBtn"
+      class="secondary"
+      disabled>
       Logout
     </button>
 
@@ -125,24 +151,25 @@
       Check Admin & Database
     </button>
 
-    <h3>Deposit ID</h3>
+    <h3>Approved TEST Deposit ID</h3>
 
     <input
       id="depositId"
       type="text"
-      placeholder="Approved TEST Deposit ID"
+      placeholder="Deposit ID"
       autocomplete="off"
       spellcheck="false">
 
-    <button id="creditBtn"
-            class="danger"
-            disabled>
+    <button
+      id="creditBtn"
+      class="danger"
+      disabled>
       Credit Test Deposit
     </button>
 
     <h3>Test Result</h3>
 
-    <pre id="result">Admin Login করুন।</pre>
+    <pre id="result">Login করুন।</pre>
   </div>
 
   <script type="module">
@@ -156,6 +183,7 @@
       signInWithPopup,
       signInWithRedirect,
       getRedirectResult,
+      signInWithEmailAndPassword,
       signOut,
       onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
@@ -169,11 +197,19 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-
     const provider = new GoogleAuthProvider();
 
-    const loginBtn =
-      document.getElementById("loginBtn");
+    const emailInput =
+      document.getElementById("email");
+
+    const passwordInput =
+      document.getElementById("password");
+
+    const emailLoginBtn =
+      document.getElementById("emailLoginBtn");
+
+    const googleLoginBtn =
+      document.getElementById("googleLoginBtn");
 
     const logoutBtn =
       document.getElementById("logoutBtn");
@@ -203,7 +239,9 @@
     function updateButtons() {
       const signedIn = Boolean(auth.currentUser);
 
-      loginBtn.disabled = busy;
+      emailLoginBtn.disabled = busy;
+      googleLoginBtn.disabled = busy;
+
       logoutBtn.disabled = busy || !signedIn;
       checkBtn.disabled = busy || !signedIn;
 
@@ -216,14 +254,46 @@
 
       show(
         user
-          ? "Login হয়েছে। Check Admin & Database চাপুন।"
-          : "Admin Login করুন।"
+          ? "Login সফল। এখন Check Admin & Database চাপুন।"
+          : "Firebase Login করুন।"
       );
 
       updateButtons();
     });
 
-    loginBtn.addEventListener("click", async () => {
+    emailLoginBtn.addEventListener("click", async () => {
+      busy = true;
+      updateButtons();
+
+      try {
+        show("Email Login হচ্ছে...");
+
+        await signInWithEmailAndPassword(
+          auth,
+          emailInput.value.trim(),
+          passwordInput.value
+        );
+
+        passwordInput.value = "";
+
+        show("Email Login সফল।");
+
+      } catch (error) {
+        passwordInput.value = "";
+
+        show({
+          success: false,
+          message: "Email Login failed",
+          code: error.code || "unknown"
+        });
+
+      } finally {
+        busy = false;
+        updateButtons();
+      }
+    });
+
+    googleLoginBtn.addEventListener("click", async () => {
       busy = true;
       updateButtons();
 
@@ -232,9 +302,7 @@
 
         await signInWithPopup(auth, provider);
 
-        show(
-          "Login সফল। এখন Check Admin & Database চাপুন।"
-        );
+        show("Google Login সফল।");
 
       } catch (error) {
         if (
@@ -261,7 +329,7 @@
     getRedirectResult(auth).catch(error => {
       show({
         success: false,
-        message: "Redirect Login failed",
+        message: "Google Redirect Login failed",
         code: error.code || "unknown"
       });
     });
@@ -345,7 +413,7 @@
         depositIdInput.value.trim();
 
       const validId =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           .test(depositId);
 
       if (!validId) {
@@ -354,8 +422,7 @@
       }
 
       const confirmed = confirm(
-        "এই অনুমোদিত TEST Deposit-এর জন্য " +
-        "শুধু simulated balance credit করবেন?"
+        "শুধু simulated TEST Deposit Balance credit করবেন?"
       );
 
       if (!confirmed) {
@@ -394,9 +461,13 @@
 
       try {
         await signOut(auth);
+
         adminVerified = false;
+        emailInput.value = "";
+        passwordInput.value = "";
         depositIdInput.value = "";
-        show("Logout হয়েছে।");
+
+        show("Logout সফল।");
 
       } finally {
         busy = false;
@@ -404,6 +475,5 @@
       }
     });
   </script>
-
 </body>
 </html>
