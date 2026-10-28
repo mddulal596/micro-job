@@ -2,7 +2,9 @@
 <html lang="bn">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
   <title>Micro Job - Test Credit</title>
 
   <style>
@@ -12,468 +14,863 @@
 
     body {
       margin: 0;
-      padding: 20px;
+      background: #f7f6fc;
       font-family: Arial, sans-serif;
-      background: #f7f5ff;
-      color: #222;
+      color: #29213d;
+    }
+
+    header {
+      background: #ffffff;
+      padding: 18px 16px;
+      text-align: center;
+      box-shadow: 0 2px 10px #26134b10;
+    }
+
+    header h2 {
+      margin: 0;
+      color: #7137ce;
+      font-size: 23px;
+    }
+
+    header p {
+      margin: 7px 0 0;
+      color: #777;
+      font-size: 12px;
+    }
+
+    main {
+      width: 100%;
+      max-width: 520px;
+      margin: 20px auto;
+      padding: 0 14px 35px;
     }
 
     .card {
-      max-width: 470px;
-      margin: 25px auto;
-      padding: 24px;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 6px 24px rgba(80, 50, 150, .1);
-    }
-
-    h2 {
-      margin-top: 0;
-      color: #673ab7;
+      background: #fff;
+      padding: 19px;
+      border-radius: 15px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 18px #2411450c;
     }
 
     h3 {
-      margin-bottom: 8px;
-      color: #555;
+      color: #6732c5;
+      font-size: 17px;
+      margin: 0 0 14px;
     }
 
-    input, button {
+    label {
+      display: block;
+      font-size: 13px;
+      margin: 12px 0 6px;
+      font-weight: bold;
+    }
+
+    input,
+    select {
       width: 100%;
       padding: 13px;
-      margin-top: 12px;
+      border: 1px solid #ded8ed;
       border-radius: 9px;
       font-size: 15px;
-    }
-
-    input {
-      border: 1px solid #ddd;
+      background: #fff;
+      color: #29213d;
     }
 
     button {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 13px;
       border: none;
-      background: #673ab7;
-      color: white;
+      border-radius: 9px;
+      font-size: 15px;
       font-weight: bold;
       cursor: pointer;
+      background: #7137ce;
+      color: #fff;
     }
 
     button:disabled {
-      opacity: .5;
+      background: #bdb5ca;
       cursor: not-allowed;
     }
 
-    .google {
-      background: white;
-      color: #333;
-      border: 1px solid #ddd;
-    }
-
     .secondary {
-      background: #eee;
-      color: #333;
+      background: #eee8fb;
+      color: #6030ad;
     }
 
-    .danger {
-      background: #b3261e;
+    .green {
+      background: #168451;
     }
 
-    .divider {
-      text-align: center;
-      margin: 15px 0 5px;
-      color: #888;
+    .red {
+      background: #d74444;
     }
 
-    .note {
+    .status {
       padding: 12px;
-      background: #fff4db;
-      border-radius: 8px;
+      border-radius: 9px;
+      background: #f1edfa;
+      color: #4c3478;
       font-size: 13px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      margin-top: 14px;
+    }
+
+    .warning {
+      background: #fff4dd;
+      color: #825b12;
+      border-radius: 9px;
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: #777;
       line-height: 1.6;
     }
 
-    pre {
-      background: #f4f4f4;
-      padding: 12px;
-      border-radius: 8px;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      font-size: 13px;
+    .hidden {
+      display: none;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #f0e8ff;
+      color: #6932c3;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      margin-top: 8px;
     }
   </style>
 </head>
 
 <body>
-  <div class="card">
-    <h2>Micro Job</h2>
-    <h3>Test Deposit Credit</h3>
 
-    <div class="note">
-      ⚠️ শুধুমাত্র TESTING MODE।
-      এখানে কোনো বাস্তব টাকা জমা বা উত্তোলন হয় না।
-      Test Balance আসল Wallet Balance নয়।
+<header>
+  <h2>Micro Job</h2>
+  <p>Secure Test Deposit Credit</p>
+  <span class="badge">TESTING MODE</span>
+</header>
+
+<main>
+
+  <div class="warning">
+    ⚠️ এটি শুধুমাত্র পরীক্ষার পেজ।
+    এখানে কোনো Real Money Deposit, Withdrawal
+    বা Lifetime Access চালু করা হচ্ছে না।
+  </div>
+
+  <section class="card">
+
+    <h3>১. Firebase Login</h3>
+
+    <div id="loggedOut">
+
+      <label>Email</label>
+      <input
+        type="email"
+        id="email"
+        placeholder="Email address"
+        autocomplete="username"
+      >
+
+      <label>Password</label>
+      <input
+        type="password"
+        id="password"
+        placeholder="Password"
+        autocomplete="current-password"
+      >
+
+      <button id="emailLoginBtn">
+        Email / Password Login
+      </button>
+
+      <button id="googleLoginBtn" class="secondary">
+        Google Admin Login
+      </button>
+
     </div>
 
-    <h3>Email / Password Login</h3>
+    <div id="loggedIn" class="hidden">
 
-    <input
-      id="email"
-      type="email"
-      placeholder="Firebase Email"
-      autocomplete="username">
+      <div class="small">
+        Logged in as:
+      </div>
 
-    <input
-      id="password"
-      type="password"
-      placeholder="Firebase Password"
-      autocomplete="current-password">
+      <div id="userInfo" class="status"></div>
 
-    <button id="emailLoginBtn">
-      Login with Email
-    </button>
+      <button id="logoutBtn" class="red">
+        Logout
+      </button>
 
-    <div class="divider">অথবা</div>
+    </div>
 
-    <button id="googleLoginBtn" class="google">
-      🔐 Sign in with Google (Admin)
-    </button>
+    <div id="authStatus" class="status">
+      Login করার জন্য অপেক্ষা করা হচ্ছে।
+    </div>
 
-    <button
-      id="logoutBtn"
-      class="secondary"
-      disabled>
-      Logout
-    </button>
+  </section>
 
-    <h3>Admin Verification</h3>
+  <section class="card">
 
-    <button id="checkBtn" disabled>
+    <h3>২. Admin ও Database যাচাই</h3>
+
+    <button id="checkAdminBtn" disabled>
       Check Admin & Database
     </button>
 
-    <h3>Approved TEST Deposit ID</h3>
+    <div id="dbStatus" class="status">
+      প্রথমে Firebase Login করুন।
+    </div>
 
-    <input
-      id="depositId"
-      type="text"
-      placeholder="Deposit ID"
-      autocomplete="off"
-      spellcheck="false">
+  </section>
 
-    <button
-      id="creditBtn"
-      class="danger"
-      disabled>
-      Credit Test Deposit
+  <section class="card">
+
+    <h3>৩. Approved TEST Deposit</h3>
+
+    <button id="loadDepositsBtn"
+            class="secondary"
+            disabled>
+      Load Approved Deposits
     </button>
 
-    <h3>Test Result</h3>
+    <label>Deposit নির্বাচন করুন</label>
 
-    <pre id="result">Login করুন।</pre>
-  </div>
+    <select id="depositSelect" disabled>
+      <option value="">
+        প্রথমে Approved Deposits লোড করুন
+      </option>
+    </select>
 
-  <script type="module">
-    import {
-      initializeApp
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    <div id="depositInfo" class="status">
+      এখনো কোনো Deposit নির্বাচন করা হয়নি।
+    </div>
 
-    import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signInWithRedirect,
-      getRedirectResult,
-      signInWithEmailAndPassword,
-      signOut,
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    <button id="creditBtn"
+            class="green"
+            disabled>
+      Credit Selected Test Deposit
+    </button>
 
-    import {
-      firebaseConfig
-    } from "./firebase-config.js";
+  </section>
 
-    const API =
-      "https://microjob-test-credit-api.mddulalhosen6.workers.dev";
+  <section class="card">
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
+    <h3>৪. Test Result</h3>
 
-    const emailInput =
-      document.getElementById("email");
+    <div id="resultStatus" class="status">
+      এখনো Test Credit করা হয়নি।
+    </div>
 
-    const passwordInput =
-      document.getElementById("password");
+    <button id="refreshDbBtn"
+            class="secondary"
+            disabled>
+      Refresh Database Counts
+    </button>
 
-    const emailLoginBtn =
-      document.getElementById("emailLoginBtn");
+  </section>
 
-    const googleLoginBtn =
-      document.getElementById("googleLoginBtn");
+</main>
 
-    const logoutBtn =
-      document.getElementById("logoutBtn");
+<script type="module">
 
-    const checkBtn =
-      document.getElementById("checkBtn");
+  import { initializeApp } from
+    "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 
-    const creditBtn =
-      document.getElementById("creditBtn");
+  import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
+    signOut
+  } from
+    "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-    const depositIdInput =
-      document.getElementById("depositId");
+  import { firebaseConfig } from
+    "./firebase-config.js";
 
-    const result =
-      document.getElementById("result");
+  const API =
+    "https://microjob-test-credit-api.mddulalhosen6.workers.dev";
 
-    let adminVerified = false;
-    let busy = false;
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
 
-    function show(data) {
-      result.textContent =
-        typeof data === "string"
-          ? data
-          : JSON.stringify(data, null, 2);
+  const $ = id => document.getElementById(id);
+
+  const emailInput = $("email");
+  const passwordInput = $("password");
+
+  const loggedOut = $("loggedOut");
+  const loggedIn = $("loggedIn");
+  const userInfo = $("userInfo");
+
+  const authStatus = $("authStatus");
+  const dbStatus = $("dbStatus");
+  const depositInfo = $("depositInfo");
+  const resultStatus = $("resultStatus");
+
+  const checkAdminBtn = $("checkAdminBtn");
+  const loadDepositsBtn = $("loadDepositsBtn");
+  const creditBtn = $("creditBtn");
+  const refreshDbBtn = $("refreshDbBtn");
+
+  const depositSelect = $("depositSelect");
+
+  let currentUser = null;
+  let adminVerified = false;
+  let deposits = [];
+  let busy = false;
+
+  function show(element, message) {
+    element.textContent = message;
+  }
+
+  function setBusy(value) {
+    busy = value;
+    updateButtons();
+  }
+
+  function updateButtons() {
+    checkAdminBtn.disabled =
+      busy || !currentUser;
+
+    loadDepositsBtn.disabled =
+      busy || !currentUser || !adminVerified;
+
+    refreshDbBtn.disabled =
+      busy || !currentUser || !adminVerified;
+
+    depositSelect.disabled =
+      busy || !adminVerified || deposits.length === 0;
+
+    const selected = deposits.find(
+      item => item.id === depositSelect.value
+    );
+
+    creditBtn.disabled =
+      busy ||
+      !adminVerified ||
+      !selected ||
+      selected.alreadyCredited;
+  }
+
+  function resetAdminState() {
+    adminVerified = false;
+    deposits = [];
+
+    depositSelect.innerHTML = "";
+
+    const option =
+      document.createElement("option");
+
+    option.value = "";
+    option.textContent =
+      "প্রথমে Approved Deposits লোড করুন";
+
+    depositSelect.appendChild(option);
+
+    show(
+      depositInfo,
+      "এখনো কোনো Deposit নির্বাচন করা হয়নি।"
+    );
+
+    updateButtons();
+  }
+
+  async function apiRequest(path, options = {}) {
+    if (!auth.currentUser) {
+      throw new Error(
+        "প্রথমে Firebase Login করুন।"
+      );
     }
 
-    function updateButtons() {
-      const signedIn = Boolean(auth.currentUser);
+    const token =
+      await auth.currentUser.getIdToken();
 
-      emailLoginBtn.disabled = busy;
-      googleLoginBtn.disabled = busy;
+    const response = await fetch(API + path, {
+      method: options.method || "GET",
+      headers: {
+        Authorization: "Bearer " + token,
+        ...(options.body
+          ? { "Content-Type": "application/json" }
+          : {})
+      },
+      body: options.body
+        ? JSON.stringify(options.body)
+        : undefined
+    });
 
-      logoutBtn.disabled = busy || !signedIn;
-      checkBtn.disabled = busy || !signedIn;
+    let data;
 
-      creditBtn.disabled =
-        busy || !signedIn || !adminVerified;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(
+        "API থেকে সঠিক JSON পাওয়া যায়নি।"
+      );
     }
 
-    onAuthStateChanged(auth, user => {
-      adminVerified = false;
+    return {
+      httpStatus: response.status,
+      ...data
+    };
+  }
+
+  async function checkAdmin() {
+    if (busy) return;
+
+    setBusy(true);
+
+    show(
+      dbStatus,
+      "Admin এবং Database যাচাই হচ্ছে..."
+    );
+
+    try {
+      const data = await apiRequest(
+        "/admin/db-test"
+      );
+
+      adminVerified =
+        data.httpStatus === 200 &&
+        data.success === true &&
+        data.databaseConnected === true &&
+        data.testCreditTriggerReady === true;
 
       show(
-        user
-          ? "Login সফল। এখন Check Admin & Database চাপুন।"
-          : "Firebase Login করুন।"
+        dbStatus,
+        JSON.stringify(data, null, 2)
       );
 
-      updateButtons();
-    });
+      if (!adminVerified) {
+        resetAdminState();
+      }
 
-    emailLoginBtn.addEventListener("click", async () => {
-      busy = true;
-      updateButtons();
+    } catch (error) {
+      resetAdminState();
 
-      try {
-        show("Email Login হচ্ছে...");
+      show(
+        dbStatus,
+        "Error: " + error.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
-        await signInWithEmailAndPassword(
-          auth,
-          emailInput.value.trim(),
-          passwordInput.value
+  async function loadDeposits() {
+    if (busy || !adminVerified) return;
+
+    setBusy(true);
+
+    show(
+      depositInfo,
+      "Approved TEST Deposits লোড হচ্ছে..."
+    );
+
+    try {
+      const data = await apiRequest(
+        "/admin/deposits/credit-eligible"
+      );
+
+      if (
+        data.httpStatus !== 200 ||
+        data.success !== true ||
+        !Array.isArray(data.deposits)
+      ) {
+        throw new Error(
+          data.message || "Deposit list failed"
         );
-
-        passwordInput.value = "";
-
-        show("Email Login সফল।");
-
-      } catch (error) {
-        passwordInput.value = "";
-
-        show({
-          success: false,
-          message: "Email Login failed",
-          code: error.code || "unknown"
-        });
-
-      } finally {
-        busy = false;
-        updateButtons();
-      }
-    });
-
-    googleLoginBtn.addEventListener("click", async () => {
-      busy = true;
-      updateButtons();
-
-      try {
-        show("Google Login হচ্ছে...");
-
-        await signInWithPopup(auth, provider);
-
-        show("Google Login সফল।");
-
-      } catch (error) {
-        if (
-          error.code === "auth/popup-blocked" ||
-          error.code ===
-            "auth/operation-not-supported-in-this-environment"
-        ) {
-          await signInWithRedirect(auth, provider);
-          return;
-        }
-
-        show({
-          success: false,
-          message: "Google Login failed",
-          code: error.code || "unknown"
-        });
-
-      } finally {
-        busy = false;
-        updateButtons();
-      }
-    });
-
-    getRedirectResult(auth).catch(error => {
-      show({
-        success: false,
-        message: "Google Redirect Login failed",
-        code: error.code || "unknown"
-      });
-    });
-
-    async function apiRequest(path, method, body) {
-      const user = auth.currentUser;
-
-      if (!user) {
-        throw new Error("Login required");
       }
 
-      const token = await user.getIdToken(true);
+      deposits = data.deposits;
 
-      const options = {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      };
+      depositSelect.innerHTML = "";
 
-      if (body !== undefined) {
-        options.headers["Content-Type"] =
-          "application/json";
+      const placeholder =
+        document.createElement("option");
 
-        options.body = JSON.stringify(body);
+      placeholder.value = "";
+      placeholder.textContent =
+        "একটি Approved TEST Deposit নির্বাচন করুন";
+
+      depositSelect.appendChild(placeholder);
+
+      for (const item of deposits) {
+        const option =
+          document.createElement("option");
+
+        option.value = item.id;
+
+        const amount =
+          Number(item.amountPaisa) / 100;
+
+        option.textContent =
+          "৳" + amount +
+          " | " + item.paymentMethod +
+          " | " + item.id.slice(0, 8) +
+          (item.alreadyCredited
+            ? " | Already Credited"
+            : " | Ready");
+
+        option.disabled =
+          item.alreadyCredited === true;
+
+        depositSelect.appendChild(option);
       }
 
-      const response = await fetch(
-        API + path,
-        options
+      const available = deposits.filter(
+        item => !item.alreadyCredited
+      ).length;
+
+      show(
+        depositInfo,
+        "মোট Approved TEST Deposits: " +
+        deposits.length +
+        "\nCredit করার জন্য প্রস্তুত: " +
+        available
       );
 
-      const data = await response.json();
+    } catch (error) {
+      deposits = [];
+      depositSelect.innerHTML = "";
 
-      return {
-        httpStatus: response.status,
-        ...data
-      };
+      const option =
+        document.createElement("option");
+
+      option.value = "";
+      option.textContent = "লোড করা যায়নি";
+
+      depositSelect.appendChild(option);
+
+      show(
+        depositInfo,
+        "Error: " + error.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function showSelectedDeposit() {
+    const selected = deposits.find(
+      item => item.id === depositSelect.value
+    );
+
+    if (!selected) {
+      show(
+        depositInfo,
+        "একটি Approved TEST Deposit নির্বাচন করুন।"
+      );
+
+      updateButtons();
+      return;
     }
 
-    checkBtn.addEventListener("click", async () => {
-      busy = true;
-      adminVerified = false;
-      updateButtons();
+    show(
+      depositInfo,
+      "Deposit ID: " + selected.id +
+      "\nAmount: ৳" +
+      (Number(selected.amountPaisa) / 100) +
+      "\nMethod: " + selected.paymentMethod +
+      "\nStatus: " +
+      (selected.alreadyCredited
+        ? "Already Credited"
+        : "Ready for Test Credit")
+    );
 
-      try {
-        show("Admin যাচাই হচ্ছে...");
+    updateButtons();
+  }
 
-        const data = await apiRequest(
-          "/admin/db-test",
-          "GET"
-        );
+  async function creditDeposit() {
+    if (busy || !adminVerified) return;
 
-        adminVerified =
-          data.httpStatus === 200 &&
-          data.success === true &&
-          data.databaseConnected === true &&
-          data.testCreditTriggerReady === true;
+    const selected = deposits.find(
+      item => item.id === depositSelect.value
+    );
 
-        show(data);
+    if (!selected || selected.alreadyCredited) {
+      show(
+        resultStatus,
+        "সঠিক Approved TEST Deposit নির্বাচন করুন।"
+      );
+      return;
+    }
 
-      } catch {
-        show({
-          success: false,
-          message: "Admin verification failed"
-        });
+    const confirmed = confirm(
+      "শুধু TEST Wallet-এ ৳" +
+      (Number(selected.amountPaisa) / 100) +
+      " Credit করবেন?\n\n" +
+      "Deposit ID:\n" +
+      selected.id +
+      "\n\nReal Balance পরিবর্তন হবে না।"
+    );
 
-      } finally {
-        busy = false;
-        updateButtons();
-      }
-    });
+    if (!confirmed) return;
 
-    creditBtn.addEventListener("click", async () => {
-      if (!adminVerified) {
-        show("আগে Admin Verification করুন।");
-        return;
-      }
+    setBusy(true);
 
-      const depositId =
-        depositIdInput.value.trim();
+    show(
+      resultStatus,
+      "Test Credit প্রক্রিয়াধীন..."
+    );
 
-      const validId =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          .test(depositId);
-
-      if (!validId) {
-        show("সঠিক Deposit ID লিখুন।");
-        return;
-      }
-
-      const confirmed = confirm(
-        "শুধু simulated TEST Deposit Balance credit করবেন?"
+    try {
+      const data = await apiRequest(
+        "/admin/deposits/test-credit",
+        {
+          method: "POST",
+          body: {
+            depositId: selected.id
+          }
+        }
       );
 
-      if (!confirmed) {
-        return;
+      show(
+        resultStatus,
+        JSON.stringify(data, null, 2)
+      );
+
+      if (
+        data.httpStatus === 201 &&
+        data.success === true
+      ) {
+        selected.alreadyCredited = true;
+        depositSelect.value = "";
+
+        show(
+          depositInfo,
+          "Test Credit সফল হয়েছে। তালিকা Refresh করুন।"
+        );
       }
 
-      busy = true;
-      updateButtons();
+    } catch (error) {
+      show(
+        resultStatus,
+        "Error: " + error.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
-      try {
-        show("Test Credit চলছে...");
+  async function emailLogin() {
+    if (busy) return;
 
-        const data = await apiRequest(
-          "/admin/deposits/test-credit",
-          "POST",
-          { depositId }
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      show(
+        authStatus,
+        "Email এবং Password লিখুন।"
+      );
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      passwordInput.value = "";
+
+      show(
+        authStatus,
+        "Login সফল হয়েছে।"
+      );
+
+    } catch (error) {
+      show(
+        authStatus,
+        "Login Error: " + error.code
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function googleLogin() {
+    if (busy) return;
+
+    setBusy(true);
+
+    const provider =
+      new GoogleAuthProvider();
+
+    try {
+      await signInWithPopup(
+        auth,
+        provider
+      );
+
+      show(
+        authStatus,
+        "Google Login সফল হয়েছে।"
+      );
+
+    } catch (error) {
+      if (
+        error.code ===
+        "auth/popup-blocked"
+      ) {
+        try {
+          await signInWithRedirect(
+            auth,
+            provider
+          );
+          return;
+        } catch (redirectError) {
+          show(
+            authStatus,
+            "Google Login Error: " +
+            redirectError.code
+          );
+        }
+      } else {
+        show(
+          authStatus,
+          "Google Login Error: " +
+          error.code
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    if (busy) return;
+
+    setBusy(true);
+
+    try {
+      await signOut(auth);
+
+      show(
+        authStatus,
+        "Logout সফল হয়েছে।"
+      );
+    } catch (error) {
+      show(
+        authStatus,
+        "Logout Error: " + error.code
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  $("emailLoginBtn").addEventListener(
+    "click",
+    emailLogin
+  );
+
+  $("googleLoginBtn").addEventListener(
+    "click",
+    googleLogin
+  );
+
+  $("logoutBtn").addEventListener(
+    "click",
+    logout
+  );
+
+  checkAdminBtn.addEventListener(
+    "click",
+    checkAdmin
+  );
+
+  loadDepositsBtn.addEventListener(
+    "click",
+    loadDeposits
+  );
+
+  depositSelect.addEventListener(
+    "change",
+    showSelectedDeposit
+  );
+
+  creditBtn.addEventListener(
+    "click",
+    creditDeposit
+  );
+
+  refreshDbBtn.addEventListener(
+    "click",
+    checkAdmin
+  );
+
+  onAuthStateChanged(
+    auth,
+    async user => {
+      currentUser = user;
+      resetAdminState();
+
+      if (user) {
+        loggedOut.classList.add("hidden");
+        loggedIn.classList.remove("hidden");
+
+        show(
+          userInfo,
+          "Email: " +
+          (user.email || "N/A") +
+          "\nUID: " + user.uid
         );
 
-        show(data);
+        show(
+          authStatus,
+          "Firebase Login সক্রিয়।"
+        );
 
-      } catch {
-        show({
-          success: false,
-          message: "Test Credit request failed"
-        });
+      } else {
+        loggedIn.classList.add("hidden");
+        loggedOut.classList.remove("hidden");
 
-      } finally {
-        busy = false;
-        updateButtons();
+        show(
+          authStatus,
+          "Firebase Login করুন।"
+        );
+
+        show(
+          dbStatus,
+          "প্রথমে Firebase Login করুন।"
+        );
       }
-    });
 
-    logoutBtn.addEventListener("click", async () => {
-      busy = true;
       updateButtons();
+    }
+  );
 
-      try {
-        await signOut(auth);
+  getRedirectResult(auth).catch(
+    error => {
+      show(
+        authStatus,
+        "Redirect Login Error: " +
+        error.code
+      );
+    }
+  );
 
-        adminVerified = false;
-        emailInput.value = "";
-        passwordInput.value = "";
-        depositIdInput.value = "";
+</script>
 
-        show("Logout সফল।");
-
-      } finally {
-        busy = false;
-        updateButtons();
-      }
-    });
-  </script>
 </body>
 </html>
