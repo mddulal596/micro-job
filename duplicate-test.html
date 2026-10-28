@@ -1,1 +1,591 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
 
+  <title>Micro Job - Duplicate Credit Test</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f7f6fc;
+      font-family: Arial, sans-serif;
+      color: #29213d;
+    }
+
+    header {
+      background: #ffffff;
+      padding: 18px 16px;
+      text-align: center;
+      box-shadow: 0 2px 10px #26134b10;
+    }
+
+    header h2 {
+      margin: 0;
+      color: #7137ce;
+      font-size: 23px;
+    }
+
+    header p {
+      margin: 7px 0 0;
+      color: #777;
+      font-size: 12px;
+    }
+
+    main {
+      width: 100%;
+      max-width: 520px;
+      margin: 20px auto;
+      padding: 0 14px 35px;
+    }
+
+    .card {
+      background: #fff;
+      padding: 19px;
+      border-radius: 15px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 18px #2411450c;
+    }
+
+    h3 {
+      color: #6732c5;
+      font-size: 17px;
+      margin: 0 0 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      margin: 12px 0 6px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ded8ed;
+      border-radius: 9px;
+      font-size: 15px;
+      background: #fff;
+      color: #29213d;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 13px;
+      border: none;
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #7137ce;
+      color: #fff;
+    }
+
+    button:disabled {
+      background: #bdb5ca;
+      cursor: not-allowed;
+    }
+
+    .secondary {
+      background: #eee8fb;
+      color: #6030ad;
+    }
+
+    .red {
+      background: #d74444;
+    }
+
+    .status {
+      padding: 12px;
+      border-radius: 9px;
+      background: #f1edfa;
+      color: #4c3478;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      margin-top: 14px;
+    }
+
+    .warning {
+      background: #fff4dd;
+      color: #825b12;
+      border-radius: 9px;
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #f0e8ff;
+      color: #6932c3;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h2>Micro Job</h2>
+  <p>Duplicate Credit Protection Test</p>
+  <span class="badge">TESTING MODE</span>
+</header>
+
+<main>
+
+  <div class="warning">
+    ⚠️ এই পেজ শুধু পরীক্ষার জন্য।
+    এটি আগে Credit হওয়া Test Deposit আবার Credit
+    করার চেষ্টা পাঠাবে। সঠিকভাবে কাজ করলে
+    Backend অনুরোধটি আটকাবে এবং কোনো Balance
+    বাড়বে না। Real Money পরিবর্তন হবে না।
+  </div>
+
+  <section class="card">
+
+    <h3>১. Firebase Login</h3>
+
+    <div id="loggedOut">
+
+      <button id="googleLoginBtn">
+        Google Admin Login
+      </button>
+
+      <label>Email (সাধারণ ইউজার পরীক্ষার জন্য)</label>
+      <input
+        type="email"
+        id="email"
+        placeholder="Email address"
+        autocomplete="username"
+      >
+
+      <label>Password</label>
+      <input
+        type="password"
+        id="password"
+        placeholder="Password"
+        autocomplete="current-password"
+      >
+
+      <button id="emailLoginBtn" class="secondary">
+        Email / Password Login
+      </button>
+
+    </div>
+
+    <div id="loggedIn" class="hidden">
+
+      <div id="userInfo" class="status"></div>
+
+      <button id="logoutBtn" class="red">
+        Logout
+      </button>
+
+    </div>
+
+    <div id="authStatus" class="status">
+      Login করুন।
+    </div>
+
+  </section>
+
+  <section class="card">
+
+    <h3>২. Duplicate Credit Test</h3>
+
+    <div class="status" id="fixedId"></div>
+
+    <button id="duplicateBtn" disabled>
+      Send Duplicate Credit Request
+    </button>
+
+    <div id="duplicateResult" class="status">
+      এখনো পরীক্ষা চালানো হয়নি।
+    </div>
+
+  </section>
+
+  <section class="card">
+
+    <h3>৩. Login ছাড়া অনুরোধ পরীক্ষা</h3>
+
+    <button id="noTokenBtn" class="secondary">
+      Send Request Without Token
+    </button>
+
+    <div id="noTokenResult" class="status">
+      এখনো পরীক্ষা চালানো হয়নি।
+    </div>
+
+  </section>
+
+</main>
+
+<script type="module">
+
+  import { initializeApp } from
+    "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+
+  import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
+    signOut
+  } from
+    "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+  import { firebaseConfig } from
+    "./firebase-config.js";
+
+  const API =
+    "https://microjob-test-credit-api.mddulalhosen6.workers.dev";
+
+  const ENDPOINT =
+    API + "/admin/deposits/test-credit";
+
+  const FIXED_DEPOSIT_ID =
+    "33d979ec-6806-4e06-8224-c700d1ded1bf";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  const $ = id => document.getElementById(id);
+
+  const emailInput = $("email");
+  const passwordInput = $("password");
+
+  const loggedOut = $("loggedOut");
+  const loggedIn = $("loggedIn");
+  const userInfo = $("userInfo");
+  const authStatus = $("authStatus");
+
+  const duplicateBtn = $("duplicateBtn");
+  const noTokenBtn = $("noTokenBtn");
+  const duplicateResult = $("duplicateResult");
+  const noTokenResult = $("noTokenResult");
+
+  let busy = false;
+
+  $("fixedId").textContent =
+    "পরীক্ষার Deposit ID:\n" + FIXED_DEPOSIT_ID +
+    "\n\nএই Deposit আগেই Credit হয়েছে।";
+
+  function show(element, message) {
+    element.textContent = message;
+  }
+
+  function updateButtons() {
+    duplicateBtn.disabled =
+      busy || !auth.currentUser;
+
+    noTokenBtn.disabled = busy;
+  }
+
+  function setBusy(value) {
+    busy = value;
+    updateButtons();
+  }
+
+  async function sendCreditRequest(token) {
+    const headers = {
+      "Content-Type": "application/json"
+    };
+
+    if (token) {
+      headers.Authorization = "Bearer " + token;
+    }
+
+    const response = await fetch(ENDPOINT, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        depositId: FIXED_DEPOSIT_ID
+      })
+    });
+
+    let data;
+
+    try {
+      data = await response.json();
+    } catch {
+      data = {
+        message: "JSON Response পাওয়া যায়নি"
+      };
+    }
+
+    return {
+      httpStatus: response.status,
+      ...data
+    };
+  }
+
+  function explainLoggedInResult(data) {
+    if (
+      data.httpStatus === 409 &&
+      data.duplicatePrevented === true
+    ) {
+      return "✅ সফল: Admin অনুরোধ পাঠালেও " +
+        "Duplicate Credit আটকানো হয়েছে।";
+    }
+
+    if (data.httpStatus === 403) {
+      return "✅ সফল: এই ইউজার Admin নয়, " +
+        "তাই Credit API ব্যবহার করতে পারেনি।";
+    }
+
+    if (data.httpStatus === 201) {
+      return "❌ সতর্কতা: Credit সফল দেখাচ্ছে। " +
+        "এখনই D1 Balance যাচাই করতে হবে।";
+    }
+
+    return "⚠️ অপ্রত্যাশিত ফলাফল। " +
+      "নিচের Response আমাকে জানান।";
+  }
+
+  async function runDuplicateTest() {
+    if (busy || !auth.currentUser) return;
+
+    setBusy(true);
+
+    show(
+      duplicateResult,
+      "অনুরোধ পাঠানো হচ্ছে..."
+    );
+
+    try {
+      const token =
+        await auth.currentUser.getIdToken();
+
+      const data =
+        await sendCreditRequest(token);
+
+      show(
+        duplicateResult,
+        explainLoggedInResult(data) +
+        "\n\n" +
+        JSON.stringify(data, null, 2)
+      );
+
+    } catch (error) {
+      show(
+        duplicateResult,
+        "Error: " + error.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runNoTokenTest() {
+    if (busy) return;
+
+    setBusy(true);
+
+    show(
+      noTokenResult,
+      "অনুরোধ পাঠানো হচ্ছে..."
+    );
+
+    try {
+      const data =
+        await sendCreditRequest(null);
+
+      const passed = data.httpStatus === 401;
+
+      show(
+        noTokenResult,
+        (passed
+          ? "✅ সফল: Token ছাড়া অনুরোধ আটকানো হয়েছে।"
+          : "⚠️ অপ্রত্যাশিত ফলাফল।") +
+        "\n\n" +
+        JSON.stringify(data, null, 2)
+      );
+
+    } catch (error) {
+      show(
+        noTokenResult,
+        "Error: " + error.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function emailLogin() {
+    if (busy) return;
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      show(
+        authStatus,
+        "Email এবং Password লিখুন।"
+      );
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      passwordInput.value = "";
+
+    } catch (error) {
+      show(
+        authStatus,
+        "Login Error: " + error.code
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function googleLogin() {
+    if (busy) return;
+
+    setBusy(true);
+
+    const provider = new GoogleAuthProvider();
+
+    try {
+      await signInWithPopup(auth, provider);
+
+    } catch (error) {
+      if (error.code === "auth/popup-blocked") {
+        try {
+          await signInWithRedirect(
+            auth,
+            provider
+          );
+          return;
+        } catch (redirectError) {
+          show(
+            authStatus,
+            "Google Login Error: " +
+            redirectError.code
+          );
+        }
+      } else {
+        show(
+          authStatus,
+          "Google Login Error: " + error.code
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    if (busy) return;
+
+    setBusy(true);
+
+    try {
+      await signOut(auth);
+    } catch (error) {
+      show(
+        authStatus,
+        "Logout Error: " + error.code
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  $("googleLoginBtn").addEventListener(
+    "click",
+    googleLogin
+  );
+
+  $("emailLoginBtn").addEventListener(
+    "click",
+    emailLogin
+  );
+
+  $("logoutBtn").addEventListener(
+    "click",
+    logout
+  );
+
+  duplicateBtn.addEventListener(
+    "click",
+    runDuplicateTest
+  );
+
+  noTokenBtn.addEventListener(
+    "click",
+    runNoTokenTest
+  );
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      loggedOut.classList.add("hidden");
+      loggedIn.classList.remove("hidden");
+
+      show(
+        userInfo,
+        "Email: " + (user.email || "N/A") +
+        "\nUID: " + user.uid
+      );
+
+      show(
+        authStatus,
+        "Firebase Login সক্রিয়।"
+      );
+
+    } else {
+      loggedIn.classList.add("hidden");
+      loggedOut.classList.remove("hidden");
+
+      show(
+        authStatus,
+        "Login করুন।"
+      );
+    }
+
+    updateButtons();
+  });
+
+  getRedirectResult(auth).catch(error => {
+    show(
+      authStatus,
+      "Redirect Login Error: " + error.code
+    );
+  });
+
+  updateButtons();
+
+</script>
+
+</body>
+</html>
