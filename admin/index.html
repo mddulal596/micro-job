@@ -30,10 +30,7 @@
     </div>
 
     <div class="header-right">
-      <a
-        href="../index.html"
-        class="home-link"
-      >
+      <a href="../index.html" class="home-link">
         <i class="fa-solid fa-house"></i>
         Home
       </a>
@@ -50,10 +47,8 @@
     </div>
   </header>
 
-
   <!-- ADMIN LOGIN -->
   <section id="adminLoginView" class="login-view">
-
     <div class="login-card">
 
       <div class="login-icon">
@@ -67,6 +62,30 @@
         প্রবেশ করতে পারবেন।
       </p>
 
+      <!-- GOOGLE ADMIN LOGIN -->
+      <button
+        type="button"
+        id="adminGoogleLoginBtn"
+        class="primary-btn"
+        style="
+          background:#ffffff;
+          color:#333333;
+          border:1px solid #dddddd;
+          margin-bottom:16px;
+        "
+      >
+        <i
+          class="fa-brands fa-google"
+          style="color:#4285f4;"
+        ></i>
+        Continue with Google
+      </button>
+
+      <p style="text-align:center;margin:10px 0;">
+        অথবা Email দিয়ে Login করুন
+      </p>
+
+      <!-- EMAIL LOGIN -->
       <form id="adminLoginForm">
 
         <div class="form-group">
@@ -97,10 +116,7 @@
           >
         </div>
 
-        <button
-          type="submit"
-          class="primary-btn"
-        >
+        <button type="submit" class="primary-btn">
           <i class="fa-solid fa-lock"></i>
           Login to Admin
         </button>
@@ -110,9 +126,7 @@
       <p id="adminLoginMessage"></p>
 
     </div>
-
   </section>
-
 
   <!-- ADMIN DASHBOARD -->
   <main
@@ -121,9 +135,7 @@
     style="display:none;"
   >
 
-    <!-- WELCOME -->
     <section class="welcome-card">
-
       <h2>
         <i class="fa-solid fa-gauge-high"></i>
         Admin Dashboard
@@ -135,89 +147,60 @@
 
       <div class="testing-warning">
         <i class="fa-solid fa-triangle-exclamation"></i>
-        Testing Mode: এখানে কোনো বাস্তব টাকা
+        TESTING MODE: এখানে কোনো বাস্তব টাকা
         জমা, উত্তোলন বা পেমেন্ট সম্পন্ন হয় না।
       </div>
-
     </section>
 
-
-    <!-- MESSAGE -->
     <div
       id="adminMessage"
       class="message hidden"
     ></div>
 
-
     <!-- DASHBOARD STATS -->
     <section class="admin-stats">
 
       <div class="stat-card">
-
         <div class="stat-icon">
           <i class="fa-solid fa-briefcase"></i>
         </div>
-
         <h3 id="pendingJobsCount">0</h3>
-
         <p>Pending Jobs</p>
-
       </div>
 
-
       <div class="stat-card">
-
         <div class="stat-icon">
           <i class="fa-solid fa-list-check"></i>
         </div>
-
         <h3 id="pendingTasksCount">0</h3>
-
         <p>Pending Tasks</p>
-
       </div>
 
-
       <div class="stat-card">
-
         <div class="stat-icon">
           <i class="fa-solid fa-wallet"></i>
         </div>
-
         <h3 id="pendingDepositsCount">0</h3>
-
         <p>Pending Deposits</p>
-
       </div>
 
-
       <div class="stat-card">
-
         <div class="stat-icon">
           <i class="fa-solid fa-money-bill-transfer"></i>
         </div>
-
         <h3 id="pendingWithdrawalsCount">0</h3>
-
         <p>Pending Withdrawals</p>
-
       </div>
 
-
       <div class="stat-card">
-
         <div class="stat-icon">
           <i class="fa-solid fa-users"></i>
         </div>
-
         <h3 id="totalUsersCount">0</h3>
-
         <p>Total Users</p>
-
       </div>
 
     </section>
-
 
     <!-- ADMIN NAVIGATION -->
     <nav class="admin-tabs">
@@ -269,39 +252,24 @@
 
     </nav>
 
-
-    <!-- PENDING JOBS -->
-    <section
-      id="adminJobsPanel"
-      class="admin-panel"
-    >
+    <!-- JOBS -->
+    <section id="adminJobsPanel" class="admin-panel">
 
       <div class="panel-heading">
-
         <h2>
           <i class="fa-solid fa-briefcase"></i>
           Pending Jobs
         </h2>
-
-        <p>
-          নতুন পোস্ট করা জব যাচাই করে অনুমোদন
-          বা বাতিল করুন।
-        </p>
-
+        <p>নতুন পোস্ট করা জব যাচাই করুন।</p>
       </div>
 
       <div id="adminJobsList" class="admin-list">
-
-        <div class="empty-state">
-          Jobs লোড হচ্ছে...
-        </div>
-
+        <div class="empty-state">Jobs লোড হচ্ছে...</div>
       </div>
 
     </section>
 
-
-    <!-- PENDING TASKS -->
+    <!-- TASKS -->
     <section
       id="adminTasksPanel"
       class="admin-panel"
@@ -309,31 +277,20 @@
     >
 
       <div class="panel-heading">
-
         <h2>
           <i class="fa-solid fa-list-check"></i>
           Pending Tasks
         </h2>
-
-        <p>
-          ব্যবহারকারীদের জমা দেওয়া কাজের
-          প্রমাণ যাচাই করুন।
-        </p>
-
+        <p>জমা দেওয়া কাজের প্রমাণ যাচাই করুন।</p>
       </div>
 
       <div id="adminTasksList" class="admin-list">
-
-        <div class="empty-state">
-          Tasks লোড হচ্ছে...
-        </div>
-
+        <div class="empty-state">Tasks লোড হচ্ছে...</div>
       </div>
 
     </section>
 
-
-    <!-- PENDING DEPOSITS -->
+    <!-- DEPOSITS -->
     <section
       id="adminDepositsPanel"
       class="admin-panel"
@@ -341,39 +298,29 @@
     >
 
       <div class="panel-heading">
-
         <h2>
           <i class="fa-solid fa-wallet"></i>
           Pending Deposits
         </h2>
-
-        <p>
-          Testing Mode-এ ডিপোজিট রিকোয়েস্ট
-          যাচাই করুন।
-        </p>
-
+        <p>Testing Mode-এর Deposit Request যাচাই করুন।</p>
       </div>
 
       <div class="testing-warning">
         <i class="fa-solid fa-circle-info"></i>
-        কমপক্ষে ৳৩০০-এর একটি টেস্ট ডিপোজিট
-        অনুমোদন করলে ব্যবহারকারীর Lifetime
-        Work Access চালু হবে। এটি বাস্তব
-        ব্যালেন্সে টাকা যোগ করবে না।
+        কমপক্ষে ৳৩০০-এর Test Deposit অনুমোদন করলে
+        Lifetime Work Access চালু হতে পারে।
+        কোনো বাস্তব Balance যোগ হবে না।
       </div>
 
       <div id="adminDepositsList" class="admin-list">
-
         <div class="empty-state">
           Deposits লোড হচ্ছে...
         </div>
-
       </div>
 
     </section>
 
-
-    <!-- PENDING WITHDRAWALS -->
+    <!-- WITHDRAWALS -->
     <section
       id="adminWithdrawalsPanel"
       class="admin-panel"
@@ -381,36 +328,25 @@
     >
 
       <div class="panel-heading">
-
         <h2>
           <i class="fa-solid fa-money-bill-transfer"></i>
           Pending Withdrawals
         </h2>
-
-        <p>
-          পুরোনো Pending Withdrawal
-          রিকোয়েস্ট দেখুন।
-        </p>
-
+        <p>পুরোনো Withdrawal Request দেখুন।</p>
       </div>
 
       <div class="testing-warning">
         <i class="fa-solid fa-triangle-exclamation"></i>
-        Testing Mode-এ নতুন Withdrawal
-        বন্ধ রয়েছে। এখানে কোনো বাস্তব
-        পেমেন্ট দেওয়া হয় না।
+        Testing Mode-এ বাস্তব Withdrawal বন্ধ।
       </div>
 
       <div id="adminWithdrawalsList" class="admin-list">
-
         <div class="empty-state">
           Withdrawals লোড হচ্ছে...
         </div>
-
       </div>
 
     </section>
-
 
     <!-- USERS -->
     <section
@@ -420,47 +356,28 @@
     >
 
       <div class="panel-heading">
-
         <h2>
           <i class="fa-solid fa-users"></i>
           Registered Users
         </h2>
-
-        <p>
-          ওয়েবসাইটের নিবন্ধিত ব্যবহারকারীদের
-          তথ্য দেখুন।
-        </p>
-
+        <p>নিবন্ধিত ব্যবহারকারীদের তথ্য দেখুন।</p>
       </div>
 
       <div id="adminUsersList" class="admin-list">
-
         <div class="empty-state">
           Users লোড হচ্ছে...
         </div>
-
       </div>
 
     </section>
 
   </main>
 
-
   <!-- FOOTER -->
   <footer class="admin-footer">
-
-    <p>
-      © 2026 Micro Job.
-      Admin Management System.
-    </p>
-
-    <p>
-      Firebase Authentication &
-      Firestore Security Rules
-    </p>
-
+    <p>© 2026 Micro Job. Admin Management System.</p>
+    <p>Firebase Authentication & Firestore Security Rules</p>
   </footer>
-
 
   <!-- JAVASCRIPT -->
   <script
