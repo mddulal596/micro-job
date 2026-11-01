@@ -1,6 +1,6 @@
 /* ============================================================
    MICRO JOB USER APP JS
-   REAL MONEY BALANCE & ESCROW INTEGRATION
+   AUTHENTICATION + REAL MONEY BALANCE + ESCROW ENGINE
    LIGHT WHITE/PURPLE DESIGN COMPATIBLE
 ============================================================ */
 
@@ -22,8 +22,7 @@ import {
   query, 
   where, 
   onSnapshot, 
-  serverTimestamp, 
-  orderBy 
+  serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -76,6 +75,128 @@ function createToastElement() {
 }
 
 /* ------------------------------------------------------------
+   AUTH TABS & FORM SWITCHING
+------------------------------------------------------------ */
+const loginTabBtn = $("loginTabBtn");
+const signupTabBtn = $("signupTabBtn");
+const loginFormView = $("loginFormView");
+const signupFormView = $("signupFormView");
+
+if (loginTabBtn && signupTabBtn) {
+  loginTabBtn.addEventListener("click", () => {
+    loginTabBtn.classList.add("active");
+    signupTabBtn.classList.remove("active");
+    if (loginFormView) loginFormView.style.display = "block";
+    if (signupFormView) signupFormView.style.display = "none";
+  });
+
+  signupTabBtn.addEventListener("click", () => {
+    signupTabBtn.classList.add("active");
+    loginTabBtn.classList.remove("active");
+    if (signupFormView) signupFormView.style.display = "block";
+    if (loginFormView) loginFormView.style.display = "none";
+  });
+}
+
+/* ------------------------------------------------------------
+   SIGNUP HANDLER
+------------------------------------------------------------ */
+const signupForm = $("signupForm");
+if (signupForm) {
+  signupForm.addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const name = $("signupNameInput")?.value.trim();
+    const email = $("signupEmailInput")?.value.trim();
+    const password = $("signupPasswordInput")?.value;
+    const confirmPassword = $("signupConfirmPasswordInput")?.value;
+
+    if (!name || !email || !password) {
+      return showToast("সব ঘর সঠিকভাবে পূরণ করুন।", true);
+    }
+    if (password.length < 6) {
+      return showToast("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।", true);
+    }
+    if (confirmPassword && password !== confirmPassword) {
+      return showToast("পাসওয়ার্ড নিশ্চিতকরণ মিলছে না।", true);
+    }
+
+    try {
+      showToast("অ্যাকাউন্ট তৈরি হচ্ছে...");
+      
+      // 1. Create Firebase Auth User
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCred.user;
+
+      // 2. Create User Document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name: name,
+        email: email,
+        mainBalance: 0,
+        depositBalance: 0,
+        createdAt: serverTimestamp()
+      });
+
+      showToast("অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!");
+      signupForm.reset();
+
+    } catch (err) {
+      console.error("Signup Error:", err);
+      let msg = "সাইনআপ ব্যর্থ হয়েছে।";
+      if (err.code === "auth/email-already-in-use") msg = "এই ইমেইল দিয়ে আগেই অ্যাকাউন্ট খোলা হয়েছে।";
+      if (err.code === "auth/invalid-email") msg = "সঠিক ইমেইল এড্রেস লিখুন।";
+      if (err.code === "auth/weak-password") msg = "পাসওয়ার্ড আরও শক্ত করুন।";
+      showToast(msg, true);
+    }
+  });
+}
+
+/* ------------------------------------------------------------
+   LOGIN HANDLER
+------------------------------------------------------------ */
+const loginForm = $("loginForm");
+if (loginForm) {
+  loginForm.addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const email = $("loginEmailInput")?.value.trim();
+    const password = $("loginPasswordInput")?.value;
+
+    if (!email || !password) {
+      return showToast("ইমেইল ও পাসওয়ার্ড লিখুন।", true);
+    }
+
+    try {
+      showToast("লগইন হচ্ছে...");
+      await signInWithEmailAndPassword(auth, email, password);
+      showToast("লগইন সফল হয়েছে!");
+      loginForm.reset();
+    } catch (err) {
+      console.error("Login Error:", err);
+      let msg = "লগইন ব্যর্থ হয়েছে। পাসওয়ার্ড বা ইমেইল ভুল।";
+      if (err.code === "auth/user-not-found") msg = "এই ইমেইলে কোনো অ্যাকাউন্ট পাওয়া যায়নি।";
+      if (err.code === "auth/wrong-password") msg = "পাসওয়ার্ড ভুল হয়েছে।";
+      showToast(msg, true);
+    }
+  });
+}
+
+/* ------------------------------------------------------------
+   LOGOUT HANDLER
+------------------------------------------------------------ */
+const logoutBtn = $("logoutBtn") || $("userLogoutBtn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      showToast("লগআউট সফল হয়েছে।");
+    } catch (err) {
+      showToast("লগআউট সমস্যা: " + err.message, true);
+    }
+  });
+}
+
+/* ------------------------------------------------------------
    REAL MONEY WALLET FETCH (FROM CLOUDFLARE D1 WORKER)
 ------------------------------------------------------------ */
 async function fetchRealWalletBalance() {
@@ -116,7 +237,8 @@ function updateBalanceUI() {
 function listenToUserAccess(uid) {
   const accessRef = doc(db, "userAccess", uid);
   const unsub = onSnapshot(accessRef, docSnap => {
-    if (docSnapshotExists(docSnap) && docSnap.data()?.workEnabled === true) {
+    const exists = typeof docSnap.exists === "function" ? docSnap.exists() : Boolean(docSnap.exists);
+    if (exists && docSnap.data()?.workEnabled === true) {
       userAccessUnlocked = true;
       updateAccessLockUI(true);
     } else {
@@ -129,14 +251,9 @@ function listenToUserAccess(uid) {
   activeListeners.push(unsub);
 }
 
-function docSnapshotExists(snap) {
-  return typeof snap.exists === "function" ? snap.exists() : Boolean(snap.exists);
-}
-
 function updateAccessLockUI(unlocked) {
   const lockNotice = $("workLockBanner");
   const postJobBtn = $("navPostJobBtn");
-  const jobsTab = $("navJobsTab");
 
   if (lockNotice) {
     lockNotice.style.display = unlocked ? "none" : "block";
@@ -147,7 +264,7 @@ function updateAccessLockUI(unlocked) {
 }
 
 /* ------------------------------------------------------------
-   AUTHENTICATION LISTENERS
+   AUTHENTICATION STATE WATCHER
 ------------------------------------------------------------ */
 onAuthStateChanged(auth, async user => {
   stopActiveListeners();
@@ -173,7 +290,7 @@ function stopActiveListeners() {
 }
 
 function showMainApp() {
-  if ($("authSection")) $("authScreenSection").style.display = "none";
+  if ($("authScreenSection")) $("authScreenSection").style.display = "none";
   if ($("mainAppSection")) $("mainAppSection").style.display = "block";
 }
 
@@ -198,7 +315,7 @@ if (postJobForm) {
     const description = $("jobDescInput")?.value.trim();
     const rewardBDT = Number($("jobRewardInput")?.value);
     const workerCount = Number($("jobWorkerCountInput")?.value);
-    const fundSource = $("jobFundSourceSelect")?.value || "deposit"; // 'main' or 'deposit'
+    const fundSource = $("jobFundSourceSelect")?.value || "deposit";
 
     if (!title || !description || rewardBDT <= 0 || workerCount <= 0) {
       return showToast("সব তথ্য সঠিকভাবে পূরণ করুন।", true);
@@ -214,7 +331,6 @@ if (postJobForm) {
     try {
       showToast("জব পোস্ট ও Escrow ফান্ডিং হচ্ছে...");
 
-      // 1. Create Pending Job in Firestore
       const jobRef = await addDoc(collection(db, "jobs"), {
         title,
         description,
@@ -226,7 +342,6 @@ if (postJobForm) {
         createdAt: serverTimestamp()
       });
 
-      // 2. Fund Escrow via Cloudflare Worker API
       const token = await currentUser.getIdToken();
       const res = await fetch(`${WORKER_API}/jobs/fund-escrow`, {
         method: "POST",
@@ -356,7 +471,7 @@ if (withdrawForm) {
     }
 
     try {
-      showToast("উত্তোলন রিকোয়েস্ট পাঠানো হচ্ছে...");
+      showToast("উত্তোলনের আবেদন পাঠানো হচ্ছে...");
       await addDoc(collection(db, "withdrawals"), {
         uid: currentUser.uid,
         email: currentUser.email,
@@ -391,8 +506,8 @@ function loadAvailableJobs() {
       return;
     }
 
-    jobsListEl.innerHTML = snap.docs.map(doc => {
-      const job = doc.data();
+    jobsListEl.innerHTML = snap.docs.map(docSnap => {
+      const job = docSnap.data();
       return `
         <div class="job-card">
           <div class="job-header">
@@ -402,7 +517,7 @@ function loadAvailableJobs() {
           <p class="job-desc">${escapeHtml(job.description)}</p>
           <div class="job-footer">
             <small>ওয়ার্কার প্রয়োজন: ${job.workerCount} জন</small>
-            <button class="primary-btn-sm" onclick="window.submitTaskProof('${doc.id}', '${escapeHtml(job.title)}')">
+            <button class="primary-btn-sm" onclick="window.submitTaskProof('${docSnap.id}', '${escapeHtml(job.title)}')">
               কাজ করুন
             </button>
           </div>
@@ -425,8 +540,8 @@ function loadMySubmittedTasks() {
       return;
     }
 
-    myTasksEl.innerHTML = snap.docs.map(doc => {
-      const task = doc.data();
+    myTasksEl.innerHTML = snap.docs.map(docSnap => {
+      const task = docSnap.data();
       return `
         <div class="task-card">
           <div class="task-header">
@@ -442,4 +557,4 @@ function loadMySubmittedTasks() {
   activeListeners.push(unsub);
 }
 
-console.log("Micro Job App - Real Money & Escrow Engine Ready");
+console.log("Micro Job App - Authentication & Escrow Engine Ready");
