@@ -9,6 +9,7 @@
 </head>
 <body>
 
+  <!-- AUTH SECTION -->
   <section id="authView" class="auth-container">
     <div class="auth-card">
 
@@ -18,6 +19,7 @@
         <p>Work • Earn • Grow</p>
       </div>
 
+      <!-- LOGIN BOX -->
       <div id="loginBox">
         <h2>Welcome Back</h2>
         <p class="subtitle">Login to your account</p>
@@ -40,6 +42,7 @@
         </p>
       </div>
 
+      <!-- REGISTER BOX -->
       <div id="registerBox" class="hidden">
         <h2>Create Account</h2>
         <p class="subtitle">Join Micro Job today</p>
@@ -70,6 +73,7 @@
     </div>
   </section>
 
+  <!-- MAIN APP SECTION -->
   <section id="appView" class="hidden">
 
     <header class="header">
@@ -94,6 +98,7 @@
     <main class="dashboard-container">
       <div id="messageBox" class="message hidden"></div>
 
+      <!-- DASHBOARD PANEL -->
       <section id="dashboardPanel" class="page active">
 
         <h2 id="welcomeText">Welcome 👋</h2>
@@ -178,11 +183,13 @@
         <div id="homeJobsList" class="jobs-list"></div>
       </section>
 
+      <!-- JOBS PANEL -->
       <section id="jobsPanel" class="page">
         <h2>Available Jobs</h2>
         <div id="activeJobsList" class="jobs-list"></div>
       </section>
 
+      <!-- POST JOB PANEL -->
       <section id="postPanel" class="page">
         <h2>Post New Job</h2>
 
@@ -208,7 +215,7 @@
 
             <div class="info-box">
               <strong>Total Job Cost: <span id="jobTotalCost">৳ 0.00</span></strong>
-              <p id="jobBalanceHint">Testing Mode: No balance will be deducted.</p>
+              <p id="jobBalanceHint">Job পোস্ট হলে ব্যালেন্স থেকে Escrow-তে ফান্ড লক হবে।</p>
             </div>
 
             <button class="btn-primary" type="submit">Submit Job</button>
@@ -219,6 +226,7 @@
         <div id="myJobsList" class="jobs-list"></div>
       </section>
 
+      <!-- TASKS PANEL -->
       <section id="tasksPanel" class="page">
         <h2>My Tasks</h2>
 
@@ -241,6 +249,7 @@
         <div id="myTasksList" class="jobs-list"></div>
       </section>
 
+      <!-- WALLET PANEL -->
       <section id="walletPanel" class="page">
         <h2>My Wallet</h2>
 
@@ -269,8 +278,7 @@
           <div class="info-box">
             <strong>Important Limits</strong>
             <p>Minimum Deposit: ৳300</p>
-            <p>Minimum Withdraw: ৳5000</p>
-            <p>Testing Mode: No real wallet settlement.</p>
+            <p>Minimum Withdraw: ৳5000 (Main Balance)</p>
           </div>
         </div>
 
@@ -290,14 +298,23 @@
         <div id="withdrawHistoryList" class="jobs-list"></div>
       </section>
 
+      <!-- DEPOSIT PANEL WITH PAYMENT NUMBERS -->
       <section id="depositPanel" class="page">
         <h2>Deposit Request</h2>
 
         <div class="card">
-          <div class="info-box">
-            <strong>Testing Mode</strong>
-            <p>Minimum Deposit: ৳300</p>
-            <p>বাস্তব টাকা পাঠাবেন না। Admin Approval শুধুমাত্র পরীক্ষামূলক Activation চালু করবে।</p>
+          <div class="info-box" style="background:#f5f3ff; border:1px solid #ddd6fe; padding:15px; border-radius:12px; margin-bottom:15px;">
+            <h3 style="color:#5145e5; margin-bottom:10px; font-size:16px;">
+              <i class="fa-solid fa-building-columns"></i> Payment Methods (Send Money)
+            </h3>
+            <p style="margin:5px 0;"><strong>bKash (Personal):</strong> <span style="color:#5145e5; font-size:16px;">01913932587</span></p>
+            <p style="margin:5px 0;"><strong>Nagad (Personal):</strong> <span style="color:#5145e5; font-size:16px;">01913932587</span></p>
+            <p style="margin:5px 0;"><strong>Rocket (Personal):</strong> <span style="color:#5145e5; font-size:16px;">019170445969</span></p>
+            <hr style="margin:10px 0; border:0; border-top:1px solid #ddd6fe;">
+            <p style="font-size:13px; color:#475569;">
+              <i class="fa-solid fa-circle-info"></i> সর্বনিম্ন ডিপোজিট <strong>৳300 টাকা</strong>। 
+              টাকা পাঠানোর পর নিচের ফর্মে Transaction ID (TrxID) বসিয়ে রিকোয়েস্ট পাঠান।
+            </p>
           </div>
 
           <form id="depositForm">
@@ -311,24 +328,25 @@
             <label for="depositAmount">Amount (৳) — Minimum 300</label>
             <input id="depositAmount" type="number" min="300" step="0.01" class="form-control" placeholder="Minimum 300" required>
 
-            <label for="depositTxn">Test Transaction ID</label>
-            <input id="depositTxn" class="form-control" placeholder="Example: TEST12345" required>
+            <label for="depositTxn">Transaction ID (TrxID)</label>
+            <input id="depositTxn" class="form-control" placeholder="Example: 9A8B7C6D5E" required>
 
-            <label for="depositNote">Note</label>
-            <textarea id="depositNote" class="form-control"></textarea>
+            <label for="depositNote">Sender Mobile Number / Note</label>
+            <textarea id="depositNote" class="form-control" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন তা লিখুন"></textarea>
 
-            <button class="btn-primary" type="submit">Send Test Deposit Request</button>
+            <button class="btn-primary" type="submit">Send Deposit Request</button>
           </form>
         </div>
       </section>
 
+      <!-- WITHDRAW PANEL -->
       <section id="withdrawPanel" class="page">
         <h2>Withdraw Request</h2>
 
         <div class="card">
           <div class="info-box">
             <strong>Minimum Withdraw: ৳5000</strong>
-            <p>Testing Mode: কোনো বাস্তব পেমেন্ট দেওয়া হবে না।</p>
+            <p>উত্তোলন শুধুমাত্র Main Balance থেকে করা যাবে।</p>
           </div>
 
           <form id="withdrawForm">
@@ -348,11 +366,12 @@
             <label for="withdrawNote">Note</label>
             <textarea id="withdrawNote" class="form-control"></textarea>
 
-            <button class="btn-primary" type="submit">Send Test Withdraw Request</button>
+            <button class="btn-primary" type="submit">Send Withdraw Request</button>
           </form>
         </div>
       </section>
 
+      <!-- PROFILE PANEL -->
       <section id="profilePanel" class="page">
         <h2>My Profile</h2>
 
@@ -381,6 +400,7 @@
 
     </main>
 
+    <!-- BOTTOM NAVIGATION -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-go="dashboard" type="button">
         <i class="fa-solid fa-house"></i> Home
